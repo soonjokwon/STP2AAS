@@ -1,4 +1,4 @@
-# stp2aas
+# STEP to Twin (stp2aas)
 
 STEP (ISO 10303) CAD models → Asset Administration Shell (AAS) digital twin packages (.aasx).
 
