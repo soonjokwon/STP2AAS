@@ -639,6 +639,9 @@ class _IdShortAllocator:
         base = _safe(name) or "Part"
         if not base[0].isalpha() and base[0] != "_":
             base = f"P_{base}"
+        # idShort is a NameType: max 128 chars (found in the wild — a 154-char part
+        # name). Truncate with room for the collision suffix below.
+        base = base[:120]
         candidate = base
         i = 1
         while candidate in self._used:
