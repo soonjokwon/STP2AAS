@@ -8,6 +8,7 @@ version = "0.2.0"
 description = "Convert STEP (ISO 10303) CAD models into AAS digital twin packages (.aasx)"
 requires-python = ">=3.11"
 readme = "README.md"
+license = {file = "LICENSE"}
 dependencies = [
     "basyx-python-sdk>=1.0",
     "pyyaml",
