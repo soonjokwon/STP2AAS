@@ -1,0 +1,24 @@
+# IDTA 02006 "Digital Nameplate" — intentionally PARTIAL (mapping-draft.md §5).
+# VERIFY: 02006 semanticIds not yet checked against the spec PDF.
+#
+# Policy D7: because a required field (URIOfTheProduct, D-4) cannot be sourced
+# from a STEP model, the Nameplate submodel is OMITTED by default. The very fact
+# that STEP cannot satisfy these required fields is a paper contribution
+# (lifecycle mismatch, gap G6) — see docs/mapping-draft.md §5/§6.
+submodel:
+  idShort: Nameplate
+  semanticId: "https://admin-shell.io/zvei/nameplate/2/0/Nameplate"   # VERIFY(D)
+
+semantics:
+  ManufacturerName: "0173-1#02-AAO677#002"                            # VERIFY(D-1)
+  ManufacturerProductDesignation: "0173-1#02-AAW338#001"              # VERIFY(D-2)
+  YearOfConstruction: "0173-1#02-AAP906#001"                          # VERIFY(D-3)
+  URIOfTheProduct: "0173-1#02-AAY811#001"                             # VERIFY(D-4)
+
+# Fields that 02006 marks required[1] but STEP cannot supply (drive D7 omission).
+required_unsatisfiable:
+  - URIOfTheProduct        # D-4
+  - ContactInformation     # D-5
+
+fallbacks:
+  organization: "unknown"  # D-1 / G2

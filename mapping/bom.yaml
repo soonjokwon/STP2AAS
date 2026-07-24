@@ -1,0 +1,17 @@
+# IDTA 02011 v1.1 — VERIFY(A*): semanticIds pending spec check
+submodel:
+  idShort: HierarchicalStructures
+  semanticId: "https://admin-shell.io/idta/HierarchicalStructures/1/1/Submodel"  # VERIFY
+elements:
+  EntryNode: "https://admin-shell.io/idta/HierarchicalStructures/EntryNode/1/0"  # VERIFY
+  Node: "https://admin-shell.io/idta/HierarchicalStructures/Node/1/0"            # VERIFY
+  HasPart: "https://admin-shell.io/idta/HierarchicalStructures/HasPart/1/0"      # VERIFY
+  SameAs: "https://admin-shell.io/idta/HierarchicalStructures/SameAs/1/0"        # VERIFY
+  BulkCount: "https://admin-shell.io/idta/HierarchicalStructures/BulkCount/1/0"  # VERIFY
+  ArcheType: "https://admin-shell.io/idta/HierarchicalStructures/ArcheType/1/0"  # VERIFY
+constants:
+  # A6 — 02011 ArcheType ValueList. "Full": the submodel nests the whole
+  # occurrence tree (flat / single mode). "OneDown": only the entry node's
+  # direct children (hierarchical mode — each sub-assembly has its own BOM).
+  ArcheTypeFull: "Full"        # VERIFY(A6): literal per 02011 v1.1 ValueList
+  ArcheTypeOneDown: "OneDown"  # VERIFY(A6): literal per 02011 v1.1 ValueList

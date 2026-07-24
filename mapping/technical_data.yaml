@@ -1,0 +1,29 @@
+# IDTA 02003 "Generic Frame for Technical Data" v1.2.
+# VERIFY(B*): the 02003 submodel/section semanticIds and the ECLASS IRDIs below
+# are NOT yet checked against the spec PDF (docs/verification-log.md). Code that
+# consumes them carries a matching VERIFY comment.
+submodel:
+  idShort: TechnicalData
+  semanticId: "https://admin-shell.io/ZVEI/TechnicalData/Submodel/1/2"  # VERIFY(B0)
+
+semantics:
+  # Standard 02003 sections / properties (ECLASS IRDIs) — VERIFY against spec.
+  GeneralInformation: "https://admin-shell.io/ZVEI/TechnicalData/GeneralInformation/1/1"      # VERIFY(B1/B2)
+  ManufacturerName: "0173-1#02-AAO677#002"                                                    # VERIFY(B2)
+  ManufacturerProductDesignation: "0173-1#02-AAW338#001"                                      # VERIFY(B1)
+  TechnicalProperties: "https://admin-shell.io/ZVEI/TechnicalData/TechnicalProperties/1/1"    # VERIFY(B3~B7)
+
+# B3~B6: no standard vocabulary exists (gap §3) -> self-defined namespace.
+props_namespace: "https://step2aas.org/props"
+props:
+  Volume: "https://step2aas.org/props/Volume/1/0"            # B3
+  SurfaceArea: "https://step2aas.org/props/SurfaceArea/1/0"  # B4
+  Centroid: "https://step2aas.org/props/Centroid/1/0"        # B5
+  CentroidX: "https://step2aas.org/props/Centroid/X/1/0"     # B5
+  CentroidY: "https://step2aas.org/props/Centroid/Y/1/0"     # B5
+  CentroidZ: "https://step2aas.org/props/Centroid/Z/1/0"     # B5
+  Material: "https://step2aas.org/props/Material/1/0"        # B6
+  Mass: "https://step2aas.org/props/Mass/1/0"                # B7
+
+fallbacks:
+  organization: "unknown"   # B2 / G2

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stp2aas"
+version = "0.2.0"
+description = "Convert STEP (ISO 10303) CAD models into AAS digital twin packages (.aasx)"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "basyx-python-sdk>=1.0",
+    "pyyaml",
+    "pillow",
+]
+
+[project.scripts]
+stp2aas = "stp2aas.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+# pythonocc-core is intentionally NOT listed here: it is not pip-installable.
+# It must come from conda-forge (see environment.yml).
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+addopts = "-x -q"
+testpaths = ["tests"]

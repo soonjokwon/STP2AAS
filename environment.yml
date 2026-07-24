@@ -1,0 +1,13 @@
+name: stp2aas
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pythonocc-core>=7.8
+  - pip
+  - pip:
+      - basyx-python-sdk>=1.0
+      - pyyaml
+      - pillow
+      - pytest
+      - ruff
