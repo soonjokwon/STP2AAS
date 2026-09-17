@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 set "HERE=%~dp0"
-title step2aas setup
+title STP2AAS setup
 
 echo ============================================================
-echo  step2aas setup  -  creates a self-contained env in .\env
+echo  STP2AAS setup  -  creates a self-contained env in .\env
 echo ============================================================
 
 REM --- locate conda -------------------------------------------------------

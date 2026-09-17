@@ -1,4 +1,4 @@
-"""Simple desktop GUI for step2aas — pick a CAD file, convert to .aasx, and view.
+"""Simple desktop GUI for STP2AAS — pick a CAD file, convert to .aasx, and view.
 
 Runs with the project's conda env python (Tkinter ships with it):
 
@@ -33,7 +33,7 @@ def _open_file(path: str) -> None:
 class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title("step2aas — STEP / AP242 → AAS")
+        root.title("STP2AAS — STEP / AP242 → AAS")
         root.geometry("760x520")
         self.q: queue.Queue = queue.Queue()
         self.last_html: str | None = None

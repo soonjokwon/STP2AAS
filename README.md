@@ -1,16 +1,13 @@
-# step2aas
+# STP2AAS
 
 Source: **https://github.com/soonjokwon/STP2AAS** (MIT License)
 
 STEP (ISO 10303) CAD models → Asset Administration Shell (AAS) digital twin packages (.aasx).
 
-Implementation for the paper *"STEP to Twin: Generating Asset Administration Shell (AAS)
-Digital Twins from STEP Models"*.
-
-![CAx-IF AS1 in AASX Package Explorer and the step2aas HTML viewer](docs/images/as1.png)
+![CAx-IF AS1 in AASX Package Explorer and the STP2AAS HTML viewer](docs/images/as1.png)
 
 CAx-IF AS1 (AP214): [AASX Package Explorer](https://github.com/eclipse-aaspe/package-explorer) on the left,
-step2aas HTML viewer on the right. Converted with `--assembly-structure hierarchical --view`.
+STP2AAS HTML viewer on the right. Converted with `--assembly-structure hierarchical --view`.
 
 ## Setup (self-contained — everything in this one folder)
 
@@ -106,8 +103,8 @@ join point, not a dead end:
 - **Suppliers** could publish part AAS for OEM BOM lookup after shared catalogue
   identities and discovery have been established.
 
-See `docs/mapping-draft.md` §0.1 and §9 for the scenarios intended for the paper
-Introduction / Discussion. `scripts/demo_basyx.py` is a minimal upload/print demo.
+See `docs/mapping-draft.md` §0.1 and §9 for downstream scenarios.
+`scripts/demo_basyx.py` is a minimal upload/print demo.
 
 Review status (2026-09-07): optional `SameAs` relationships are omitted; `HasPart`
 uses Entity model references and self-managed Nodes use `globalAssetId` for asset
