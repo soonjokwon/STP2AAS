@@ -1,7 +1,5 @@
 # STP2AAS
 
-Source: **https://github.com/soonjokwon/STP2AAS** (MIT License)
-
 STEP (ISO 10303) CAD models → Asset Administration Shell (AAS) digital twin packages (.aasx).
 
 ![CAx-IF AS1 in AASX Package Explorer and the STP2AAS HTML viewer](docs/images/as1.png)
@@ -162,3 +160,10 @@ The public CAx-IF AS1 sample used in the screenshot is `tests/as1/as1_root.stp`.
 - `docs/mapping-draft.md` — STEP ↔ IDTA submodel mapping specification (authoritative)
 - `docs/identity-policy.md` — identifier scheme and XML v2 migration
 - `docs/verification-log.md` — semanticId verification status + extraction/AP242 validation
+
+## Author
+
+**Soonjo Kwon** — School of Mechanical Engineering, Pusan National University,
+Busan, Republic of Korea ([soonjo.kwon@pusan.ac.kr](mailto:soonjo.kwon@pusan.ac.kr)).
+
+Released under the MIT License (`LICENSE`).
