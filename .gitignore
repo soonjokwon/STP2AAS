@@ -1,0 +1,39 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+/tmp/
+out/
+# In-folder conda environment created by setup.bat (large; rebuild with setup.bat).
+/env/
+
+# CAD test data is large and not committed — only paths are referenced by tests.
+tests/fixtures/*.stp
+tests/fixtures/*.step
+# Real-world AP242 / STEP datasets dropped in for local testing.
+tests/*.step
+tests/*.stp
+tests/km3-d5-242_v2/
+tests/r50j_as3/
+tests/xml/
+tests/fusion360/
+*.stpx
+*.stpz
+*.x3d
+*.7z
+*.aasx
+
+# Paper manuscript, editorial notes, and local agent instructions.
+# Keep them on disk; they are not part of the public code release.
+/docs/paper/
+/docs/review-prompt.md
+/docs/review-report.md
+/docs/followup-review.md
+/docs/milestones.md
+/CLAUDE.md
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp

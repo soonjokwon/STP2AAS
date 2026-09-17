@@ -1,0 +1,19 @@
+# IDTA 02011-1-1 — semanticIds verified against
+# IDTA-02011-1-1_Submodel_HierarchicalStructuresEnablingBoM.pdf (2024-06)
+submodel:
+  idShort: HierarchicalStructures
+  semanticId: "https://admin-shell.io/idta/HierarchicalStructures/1/1/Submodel"
+elements:
+  EntryNode: "https://admin-shell.io/idta/HierarchicalStructures/EntryNode/1/0"
+  Node: "https://admin-shell.io/idta/HierarchicalStructures/Node/1/0"
+  HasPart: "https://admin-shell.io/idta/HierarchicalStructures/HasPart/1/0"
+  SameAs: "https://admin-shell.io/idta/HierarchicalStructures/SameAs/1/0"
+  BulkCount: "https://admin-shell.io/idta/HierarchicalStructures/BulkCount/1/0"
+  ArcheType: "https://admin-shell.io/idta/HierarchicalStructures/ArcheType/1/0"
+constants:
+  # A6 — 02011 ArcheType ValueList. "Full": the submodel nests the whole
+  # occurrence tree (flat / single mode). "OneDown": only the entry node's
+  # direct children (hierarchical mode — each sub-assembly has its own BOM).
+  ArcheType: "Full"            # legacy alias (flat / single)
+  ArcheTypeFull: "Full"
+  ArcheTypeOneDown: "OneDown"

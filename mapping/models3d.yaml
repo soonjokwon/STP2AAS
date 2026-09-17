@@ -1,0 +1,88 @@
+# IDTA 02026-1-0 "Provision of 3D Models" — semanticIds verified against spec PDF
+# (docs/verification-log.md, mapping-draft.md §4 ✅). Element semanticIds are the
+# doc §4 path tails prefixed with the Models3D base; the mapper (models3d.py)
+# loads them by key so nothing is hardcoded (CLAUDE.md coding rules).
+submodel:
+  idShort: Models3D
+  semanticId: "https://admin-shell.io/idta/Models3D/1/0"
+
+# semanticIds for every SubmodelElement, keyed by its logical name.
+semantics:
+  Model3D: "https://admin-shell.io/idta/Models3D/Model3D/1/0"
+  # --- [SMC] File (C1~C12) ---
+  File: "https://admin-shell.io/idta/Models3D/Model3D/File/1/0"
+  FileId: "https://admin-shell.io/idta/Models3D/Model3D/File/FileId/1/0"                       # C2
+  FileDomainId: "https://admin-shell.io/idta/Models3D/Model3D/File/FileId/FileDomainId/1/0"     # C2
+  ValueId: "https://admin-shell.io/idta/Models3D/Model3D/File/FileId/ValueId/1/0"               # C2
+  IsPrimary: "https://admin-shell.io/idta/Models3D/Model3D/File/FileId/IsPrimary/1/0"           # C2
+  FileClassification: "https://admin-shell.io/idta/Models3D/Model3D/File/FileClassification/1/0"           # C12
+  ClassId: "https://admin-shell.io/idta/Models3D/Model3D/File/FileClassification/ClassId/1/0"             # C12
+  ClassName: "https://admin-shell.io/idta/Models3D/Model3D/File/FileClassification/ClassName/1/0"         # C12
+  ClassificationSystem: "https://admin-shell.io/idta/Models3D/Model3D/File/FileClassification/ClassificationSystem/1/0"  # C12
+  FileVersion: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/1/0"
+  DigitalFile: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/DigitalFile/1/0"  # C1
+  Title: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/Title/1/0"              # C3
+  FileName: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileName/1/0"        # C4
+  FileVersionId: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileVersionId/1/0"  # C5
+  StatusValue: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/StatusValue/1/0"  # C6
+  SetDate: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/SetDate/1/0"          # C7
+  FileFormat: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileFormat/1/0"    # C8
+  FormatName: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileFormat/FormatName/1/0"        # C8
+  FormatVersion: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileFormat/FormatVersion/1/0"  # C8
+  FormatQualifier: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/FileFormat/FormatQualifier/1/0"  # C8
+  SourceApplication: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/SourceApplication/1/0"     # C9
+  ApplicationName: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/SourceApplication/ApplicationName/1/0"        # C9
+  ApplicationVersion: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/SourceApplication/ApplicationVersion/1/0"  # C9
+  VendorOrganization: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/SourceApplication/VendorOrganization/1/0"  # C9
+  ProvidingOrganization: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/ProvidingOrganization/1/0"  # C10
+  OrganizationName: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/ProvidingOrganization/OrganizationName/1/0"  # C10
+  PreviewFile: "https://admin-shell.io/idta/Models3D/Model3D/File/FileVersion/PreviewFile/1/0"  # C11
+  # --- [SMC] Capability (C18~C21) ---
+  Capability: "https://admin-shell.io/idta/Models3D/Model3D/Capability/1/0"
+  ObjectType: "https://admin-shell.io/idta/Models3D/Model3D/Capability/ObjectType/1/0"          # C18
+  Origin: "https://admin-shell.io/idta/Models3D/Model3D/Capability/Origin/1/0"                  # C19
+  PosModelPurpose: "https://admin-shell.io/idta/Models3D/Model3D/Capability/PosModelPurpose/1/0"  # C20
+  EmbeddedInfo: "https://admin-shell.io/idta/Models3D/Model3D/Capability/EmbeddedInfo/1/0"      # C21
+  # --- [SMC] Geometry (C22~C25) ---
+  Geometry: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/1/0"
+  Representation: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/Representation/1/0"    # C22
+  LengthUnit: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/LengthUnit/1/0"            # C23
+  CartBoundingBox: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartBoundingBox/1/0"  # C24
+  BoundingBoxKind: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartBoundingBox/BoundingBoxKind/1/0"      # C24
+  CartBoundingVector: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartBoundingBox/CartBoundingVector/1/0"  # C24
+  CartRefSystem: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartRefSystem/1/0"                    # C25 — NOT emitted (D8 / G1)
+  CartOffsetVector: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartRefSystem/CartOffsetVector/1/0"
+  NormOrientationVector: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartRefSystem/NormOrientationVector/1/0"
+  # step2aas extension: assembly placement scene (per-occurrence world transforms).
+  # Official G1 workaround (design decision D8). Non-standard.
+  PlacementScene: "https://step2aas.org/ext/PlacementScene/1/0"
+  ConversionProvenance: "https://step2aas.org/ext/ConversionProvenance/1/0"
+
+constants:
+  StatusValue: "Released"          # C6, ValueList-StatusValue
+  Origin: "DesignEngineering"      # C19, ValueList-Origin
+  PosModelPurpose: "DesignEngineering"  # C20 — gap G5 (no "authoritative geometry" value), provisional
+  Representation: "SolidBody"      # deprecated C22 setting; no longer used for inference
+  RepresentationKinds:            # C22, 02026-1-0 p109 Table107; detected OCCT topology
+    solid: "SolidBody"
+    wire: "WireFrame"
+    surface: "Surface"
+    mesh: "Mesh"
+    point: "PointCloud"
+  BoundingBoxKind: "MinEnvelope"   # C24, ValueList-BoundingBoxKind
+  LengthUnit: "mm"                 # C23
+  FileVersionId: "1"               # C5 fallback if no file hash; writer passes hash[:12] (D5)
+  EmbeddedInfoPMI: "PMI"           # C21
+  ObjectType:                      # C18, ValueList-ObjectType
+    assembly: "Assembly"
+    component: "Component"
+  # MIME for .stp (C1 ⚠️): official model/step unregistered; "application/step"
+  # is the common convention (spec fallback is application/octet-stream).
+  StepMimeType: "application/step"          # VERIFY(C1)
+  PreviewMimeType: "image/png"
+  FileClassification:              # C12 — gap G4, self-defined
+    ClassId: "CAD-3D"
+    ClassName: "3D CAD model"
+    ClassificationSystem: "step2aas-internal"
+fallbacks:
+  organization: "unknown"          # G2 / D7
