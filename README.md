@@ -59,13 +59,14 @@ Options:
   - `lean-hierarchical` — AAS only for the root and for every design used more than
     once. Same answers as `hierarchical` (every repeated design is one asset), fewer AAS.
   - `lean-flat` — AAS only for the root and for every part used more than once. Same
-    answers as `flat` (every part use keeps its own BOM entry), fewer AAS.
+    answers as `flat` (every part use is listed separately in a BOM), fewer AAS.
     In both lean modes, a part without its own AAS keeps its STEP file as an extra
     Model3D entry of the AAS whose BOM lists it.
 
   The root `globalAssetId` is identical across modes (same physical asset), while root
   AAS/submodel ids differ per mode — outputs of several modes for the same file can be
   loaded into one repository side by side. Part AAS are shared between hierarchical/flat.
+  See *Choosing a packaging option* below.
 - `--link-only` — do not embed the original whole-model file (DigitalFile holds its
   path). Split per-part STEP files are still embedded.
 - `--include-partial-nameplate` — emit the intentionally-incomplete 02006 Nameplate
@@ -83,6 +84,33 @@ python -m step2aas assembly.stp -o out/assembly.aasx --view
 python -m step2aas Torque_Convertor_Assy.stpx -o out/converter.aasx --open
 ```
 
+## Choosing a packaging option
+
+STEP stores a sub-assembly once and records each place where it is used; the AAS
+only knows assets and BOM entries. For a component that occurs more than once, a
+package can answer two different questions:
+
+- **Is it the same design?** (spare parts, catalogues, suppliers, engineering
+  changes) — only if the design has its own AAS.
+- **Which use is it?** (assembly records, torques, positions, plant or robot
+  models) — only if the use is listed separately in a BOM.
+
+The two conflict **only inside repeated sub-assemblies**: if a repeated
+sub-assembly has its own AAS, the parts inside it are listed once for all its uses.
+Repeated parts and designs used once never cause the conflict.
+
+| Option | Repeated designs shown as one design | Every part use listed separately | AAS count |
+|---|---|---|---|
+| `hierarchical` | yes | no, inside repeated sub-assemblies | most |
+| `lean-hierarchical` | yes | no, inside repeated sub-assemblies | fewer |
+| `flat` | parts only | yes | medium |
+| `lean-flat` | parts only | yes | fewer |
+| `single` | no | yes | one |
+
+Rule of thumb: data per use → `lean-flat` (or `flat`); one asset per reused design
+→ `lean-hierarchical`; every sub-assembly as a deliverable → `hierarchical`. If the
+model has no repeated sub-assembly, every option lists all uses separately.
+
 ## What it produces
 
 - Default **hierarchical** composition: one AAS per unique part **and** per unique
@@ -91,10 +119,22 @@ python -m step2aas Torque_Convertor_Assy.stpx -o out/converter.aasx --open
   plus part AAS (nested sub-assemblies as co-managed BOM nodes). `--assembly-structure
   single` packs the whole model into one AAS.
 - Repeated parts collapse to a single AAS referenced by multiple BOM Nodes (design decision D2).
+- **Positions of every part use** (no IDTA template element exists for them) are
+  stored in a `PlacementScene` JSON file referenced from the assembly's 3D-model
+  submodel: one record per use with the asset id, a 4x4 transform in millimetres,
+  the path of child indices from that assembly, and the deepest BOM Node on that
+  path (`bom`, `node`, `below`). Uses inside a shared sub-assembly BOM are told
+  apart by their path (mapping D8).
 - The original STEP is embedded per part as an AASX supplementary file; a 512² preview PNG is
   rendered offscreen (solid-colour placeholder fallback on headless GL failure, D6).
 
 ## Downstream use (why a Type AAS from CAD)
+
+The AAS is being adopted as the exchange format for industrial digital twins, for
+example in the [Catena-X](https://catena-x.net) data space (CX-0002 *Digital Twins in
+Catena-X*) and for the EU Digital Product Passport, starting with the battery passport
+([IDTA](https://industrialdigitaltwin.org)). Design data for these twins already exists
+in CAD; STP2AAS turns it into a package instead of re-entering it.
 
 The converter emits **design-time Type AAS**, not a live factory twin. That is the
 join point, not a dead end:
@@ -139,6 +179,23 @@ view.bat out\suspension.aasx --open       # build + open (click a part to load i
 view.bat out\part.aasx --no-3d            # structure only (faster)
 python -m step2aas.viewer out\x.aasx      # equivalent module form
 ```
+
+## Reproducing the evaluation
+
+The scripts below need only the generated packages (the reader shares no code with
+the converter):
+
+- `scripts/reconstruct_aasx.py` — package-only reader: rebuilds the assembly from
+  BOMs and placement scenes, counts shared designs and separately listed uses.
+- `scripts/evaluate_compositions.py`, `scripts/evaluate_lean.py` — compare the
+  packages of all options with the predictions from the product graph.
+- `scripts/aascore_verify.py` — independent constraint check with aas-core3.1.
+- `scripts/fusion_namematch.py`, `scripts/fusion_crosscheck.py` — compare package
+  values with the native Fusion 360 records.
+- `scripts/case_stats.py`, `scripts/size_law.py`, `scripts/paper_stats.py` —
+  case-study records, package-size prediction, and summary numbers.
+- `scripts/ocp_compat/` — a thin `OCC.*` layer over the OCP bindings, so the
+  converter also runs where pythonocc-core is unavailable.
 
 ## Testing
 
