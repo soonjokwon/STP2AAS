@@ -26,7 +26,7 @@ Table 3(갭 분석)의 기초 자료, (3) 매핑 불가 항목의 갭 분석과 
 | AAS 단위 | **부품(part)별 AAS 1개 + 어셈블리 AAS** (기본 hierarchical; 아래 구성 모드 참조) | AAS 철학상 자산 단위가 부품. 부품 재사용/공급망 시나리오에 자연스러움 |
 | 어셈블리 구조 표현 | 어셈블리 AAS의 02011 서브모델이 EntryNode가 되고, Node의 globalAssetId가 자식 자산을 식별. **자체 AAS가 없는** 중간 서브어셈블리만 Co-managed (flat 모드) | 02011-1-1 Self- vs Co-managed |
 | AAS id 생성 | `urn:step2aas:{uuid5}` — 파일 해시 + prototype `ref_key` 기반 결정론적 UUID | 재변환 시 동일 id 보장 (idempotency) |
-| 구성 모드 (`--assembly-structure`) | **hierarchical**(기본): 고유 부품·고유 서브어셈블리마다 AAS, 각 어셈블리 BOM은 직계 자식만(A6 ArcheType=`OneDown`), Node의 globalAssetId로 자식 자산 조회. **flat**: 루트 AAS 1개 + 고유 부품 AAS, BOM은 전체 트리 중첩(ArcheType=`Full`), 자체 AAS가 없는 중간 서브어셈블리 Node는 co-managed. **single**: 전체 모델이 AAS 1개, 모든 부품은 Model3D 엔트리, BOM 전체 트리는 co-managed(ArcheType=`Full`) | 사용처별 트레이드오프(표준 충실 vs 패키지 단순성) |
+| 구성 모드 (`--assembly-structure`) | **hierarchical**(기본): 고유 부품·고유 서브어셈블리마다 AAS, 각 어셈블리 BOM은 직계 자식만(A6 ArcheType=`OneDown`), Node의 globalAssetId로 자식 자산 조회. **flat**: 루트 AAS 1개 + 고유 부품 AAS, BOM은 전체 트리 중첩(ArcheType=`Full`), 자체 AAS가 없는 중간 서브어셈블리 Node는 co-managed. **single**: 전체 모델이 AAS 1개, 모든 부품은 Model3D 엔트리, BOM 전체 트리는 co-managed(ArcheType=`Full`). **lean-hierarchical** / **lean-flat** (D9): 루트 + 2회 이상 쓰인 설계(lean-hierarchical) 또는 2회 이상 쓰인 부품(lean-flat)만 AAS | 사용처별 트레이드오프(표준 충실 vs 패키지 단순성) |
 | 모드 간 id 규칙 | 루트 **globalAssetId는 세 모드 공통**(동일 물리 자산), 루트 **AAS/서브모델 id는 모드별 상이**. 부품 AAS id는 hierarchical/flat 간 공유(내용 동일, D2) | 같은 파일의 여러 모드 산출물을 한 저장소에 동시 적재 가능 |
 | 형상 파일 배치 | **원본 STEP만** 부품 단위로 분리하여 AASX supplementary file 로 임베드. 경량 포맷(X3D/glTF) 파생은 future work — CLI 에 `--derive-lightweight` 슬롯만 예약 | 02026 취지가 "형상 재정의가 아닌 제공(provision)". 원본만으로 템플릿 요구 충족 |
 | 추출 엔진 | **pythonocc-core (XDE/XCAF) 단독** + P21 헤더 텍스트 파싱. XDE 순회 로직은 STP2X3D(C++)의 구조를 이식 | 단일 언어 저장소, 미리보기 렌더까지 동일 스택에서 해결 |
@@ -213,7 +213,7 @@ step2aas 가 산출하는 것은 **설계 시점 Type AAS** 다. STEP 은 제조
 
 ---
 
-## 7. 설계 결정 (D1~D8 — 확정, §8 체크리스트 참조)
+## 7. 설계 결정 (D1~D9 — 확정, §8 체크리스트 참조)
 
 | ID | 질문 | 채택안 |
 |---|---|---|
@@ -224,7 +224,8 @@ step2aas 가 산출하는 것은 **설계 시점 Type AAS** 다. STEP 은 제조
 | D5 | 재변환 시 FileVersionId | 입력 fingerprint 앞 12자(P21 원본 SHA-256, XML v2 dependency manifest hash). 전체해시는 provenance에 기록 |
 | D6 | PreviewFile 생성 | **pythonocc 오프스크린 렌더러 확정.** 헤드리스 OpenGL 실패 시 단색 placeholder PNG fallback 필수 |
 | D7 | 필수 필드 미충족 처리 | Nameplate 생략 / 02026 내 필수: fallback 상수 + provenance Qualifier |
-| D8 | 인스턴스 4×4 의 표준 슬롯 | **C25 CartRefSystem 을 내보내지 않음.** 어셈블리 `PlacementScene` JSON 이 G1 의 provision artifact |
+| D8 | 인스턴스 4×4 의 표준 슬롯 | **C25 CartRefSystem 을 내보내지 않음.** 어셈블리 `PlacementScene` JSON 이 G1 의 provision artifact. 각 instance 는 `asset`·`world` 외에 occurrence 키를 가진다: `path`(어셈블리 기준 자식 인덱스 경로), `bom`(같은 어셈블리 BOM submodel id), `node`(해당 경로에서 가장 깊은 BOM Node 의 idShort 경로), `below`(Node 아래 BOM 에 없는 occurrence 단계 수; OneDown 에서 깊은 occurrence 는 `below`≥1). |
+| D9 | 반복 설계만 AAS 를 받는 구성 | **lean-hierarchical**: S = {root} ∪ R (R = 루트에서 경로가 2개 이상인 설계), **lean-flat**: S = {root} ∪ (R ∩ 부품). 각 S-어셈블리 BOM 은 S 에 속한 자식에서 멈추고(self-managed Node), S 밖 서브어셈블리는 co-managed Node 로 인라인 중첩(커버리지 규칙). ArcheType: S-어셈블리 자식이 하나라도 있으면 `OneDown`, 아니면 `Full`. AAS 가 없는 부품의 STEP 은 그 부품을 나열하는 BOM 의 AAS 에 추가 Model3D 엔트리로 넣고, PlacementScene instance 에 `file` 키로 연결. 루트·서브어셈블리 AAS/서브모델 id 는 `lean-h:`/`lean-f:` 접두사로 모드별 분리, asset id 는 다른 모드와 공유. 규칙 1·2 의 결과는 각각 hierarchical·flat 과 같고 AAS 수만 줄어든다 (tests/test_lean.py, scripts/evaluate_lean.py). |
 
 ---
 
@@ -233,7 +234,7 @@ step2aas 가 산출하는 것은 **설계 시점 Type AAS** 다. STEP 은 제조
 - [x] semanticId 대조: 02011-1-1, 02003-1-2, 02006-2-0, 02026-1-0 (최신 메이저 버전으로의 이전은 보류)
 - [ ] admin-shell-io/submodel-templates 샘플 AASX 와 Package Explorer 구조 비교 (사용자 GUI)
 - [x] M0 스파이크: XDE 추출 S1~S12 / S14 (GVP 는 파일에서 못 읽고 BRepGProp)
-- [x] D1~D8 확정 (본 절 §7)
+- [x] D1~D9 확정 (본 절 §7)
 - [ ] 갭 G1 신규성의 체계적 문헌 검토 — 검토한 템플릿 범위의 공백과 전체 신규성은 구분
 - [x] AP242 Domain Model XML 입력
 - [ ] M4: fixtures 전체 평가 CSV + (선택) BaSyx 업로드 데모 — `scripts/evaluate.py`, `scripts/demo_basyx.py`

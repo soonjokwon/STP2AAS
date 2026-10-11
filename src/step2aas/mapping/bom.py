@@ -36,6 +36,8 @@ def build_bom(
     recurse: bool = True,
     linked: bool = True,
     strategy: BomStrategy = "occurrence",
+    node_paths: dict[tuple[int, ...], str] | None = None,
+    in_aas: Callable[[PartNode], bool] | None = None,
 ) -> model.Submodel:
     """A1~A6. `asset_id_of(part)` resolves a node's AAS globalAssetId.
 
@@ -53,10 +55,23 @@ def build_bom(
     A node is linked only when its target AAS actually exists: in flat mode
     (linked + recurse) nested sub-assemblies exist only as BOM nodes — no AAS —
     so those become co-managed; their leaf parts still link normally.
+    node_paths (optional, filled in place): occurrence path (child indices from
+    `root`) → idShort path of the Node representing that occurrence in this BOM,
+    e.g. (0, 2) → "EntryNode.Node1.Node4". Occurrences without a Node in this
+    submodel (deeper than one level under OneDown) are absent. Used to key the
+    PlacementScene by occurrence (G1/D8).
+    in_aas (lean modes, D9): a predicate naming the designs that have their own
+                    AAS. It overrides `recurse`/`linked` per node: a child in the set
+                    becomes a self-managed leaf Node (its own BOM continues the
+                    structure); a child assembly outside it is nested inline as a
+                    co-managed Node (coverage rule: each structure is written once).
+                    ArcheType is "OneDown" if any child assembly continues in its own
+                    BOM, otherwise "Full".
     A4: optional SameAs is omitted. IDTA 02011-1-1 Table 5 defines it between
     Entities, not from an Entity to an external asset identifier.
     """
     counter = _Counter()
+    stops: list[bool] = []
 
     # A1: root product → EntryNode; globalAssetId = the assembly AAS's asset id.
     entry = model.Entity(
@@ -67,7 +82,25 @@ def build_bom(
     )
 
     has_part: list[tuple[model.Entity, model.Entity]] = []
-    _emit_children(root, entry, has_part, asset_id_of, counter, recurse, linked, strategy)
+    _emit_children(
+        root,
+        entry,
+        has_part,
+        asset_id_of,
+        counter,
+        recurse,
+        linked,
+        strategy,
+        path=(),
+        id_path="EntryNode",
+        node_paths=node_paths,
+        in_aas=in_aas,
+        stops=stops,
+    )
+    if in_aas is not None:
+        archetype = "ArcheTypeOneDown" if any(stops) else "ArcheTypeFull"
+    else:
+        archetype = "ArcheTypeFull" if recurse else "ArcheTypeOneDown"
 
     submodel = model.Submodel(
         id_=sm_id,
@@ -79,7 +112,7 @@ def build_bom(
             model.Property(
                 id_short="ArcheType",
                 value_type=model.datatypes.String,
-                value=_RULES["constants"]["ArcheTypeFull" if recurse else "ArcheTypeOneDown"],
+                value=_RULES["constants"][archetype],
                 semantic_id=_sem("ArcheType"),
             ),
             entry,
@@ -107,6 +140,12 @@ def _emit_children(
     recurse: bool,
     linked: bool,
     strategy: BomStrategy,
+    *,
+    path: tuple[int, ...] = (),
+    id_path: str = "EntryNode",
+    node_paths: dict[tuple[int, ...], str] | None = None,
+    in_aas: Callable[[PartNode], bool] | None = None,
+    stops: list[bool] | None = None,
 ) -> None:
     if strategy == "bulk":
         groups: dict[str, list[PartNode]] = defaultdict(list)
@@ -130,9 +169,21 @@ def _emit_children(
                 bulk_count=len(members),
             )
         return
-    for child in parent_part.children:
+    for i, child in enumerate(parent_part.children):
         _emit_node(
-            child, parent_entity, has_part, asset_id_of, counter, recurse, linked, strategy
+            child,
+            parent_entity,
+            has_part,
+            asset_id_of,
+            counter,
+            recurse,
+            linked,
+            strategy,
+            path=path + (i,),
+            id_path=id_path,
+            node_paths=node_paths,
+            in_aas=in_aas,
+            stops=stops,
         )
 
 
@@ -147,11 +198,22 @@ def _emit_node(
     strategy: BomStrategy,
     *,
     bulk_count: int | None = None,
+    path: tuple[int, ...] = (),
+    id_path: str = "EntryNode",
+    node_paths: dict[tuple[int, ...], str] | None = None,
+    in_aas: Callable[[PartNode], bool] | None = None,
+    stops: list[bool] | None = None,
 ) -> None:
     """A2: one Node per occurrence, or per unique ref_key when strategy='bulk'."""
     # Flat mode nests sub-assemblies that have no AAS of their own — those nodes
     # must be co-managed (no globalAssetId / SameAs target exists for them).
     node_linked = linked and not (recurse and part.is_assembly)
+    descend = recurse
+    if in_aas is not None:  # D9: per-node choice from the packaging set
+        node_linked = in_aas(part)
+        descend = part.is_assembly and not node_linked
+        if stops is not None and part.is_assembly and node_linked:
+            stops.append(True)
     part_asset_id = asset_id_of(part) if node_linked else None
     node = model.Entity(
         id_short=f"Node{counter.next('node')}",
@@ -179,9 +241,24 @@ def _emit_node(
 
     parent.statement.add(node)
     has_part.append((parent, node))  # A3 (wired later)
-    if recurse:  # nest sub-assemblies inline; hierarchical mode stops at direct children
+    node_id_path = f"{id_path}.{node.id_short}"
+    if node_paths is not None and bulk_count is None:
+        node_paths[path] = node_id_path
+    if descend:  # nest sub-assemblies inline; hierarchical mode stops at direct children
         _emit_children(
-            part, node, has_part, asset_id_of, counter, recurse, linked, strategy
+            part,
+            node,
+            has_part,
+            asset_id_of,
+            counter,
+            recurse,
+            linked,
+            strategy,
+            path=path,
+            id_path=node_id_path,
+            node_paths=node_paths,
+            in_aas=in_aas,
+            stops=stops,
         )
 
 

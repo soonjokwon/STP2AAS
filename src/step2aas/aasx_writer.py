@@ -36,7 +36,11 @@ _NS = uuid.UUID("6f9619ff-8b86-d011-b42d-00cf4fc964ff")
 _ORG_FALLBACK = load("models3d")["fallbacks"]["organization"]  # G2
 
 
-ASSEMBLY_STRUCTURES = ("hierarchical", "flat", "single")
+ASSEMBLY_STRUCTURES = ("hierarchical", "flat", "single", "lean-hierarchical", "lean-flat")
+# D9: the lean options give an AAS only to the root and to repeated designs
+# (lean-hierarchical) or repeated parts (lean-flat). Prefix keeps their root and
+# sub-assembly AAS/submodel ids apart from the other modes; asset ids are shared.
+_LEAN_PREFIX = {"lean-hierarchical": "lean-h", "lean-flat": "lean-f"}
 
 
 @dataclass(frozen=True)
@@ -68,6 +72,13 @@ def write_aasx(
                        sub-assemblies appear only as BOM nodes.
       "single"       — one AAS for the whole model (all parts as Model3D entries,
                        a co-managed BOM tree). Experimental / comparison baseline.
+      "lean-hierarchical" — AAS for the root and every design used more than once
+                       (D9): same visibility and own entries as hierarchical,
+                       fewer AAS.
+      "lean-flat"    — AAS for the root and every part used more than once (D9):
+                       same as flat, fewer AAS.
+      In the lean modes a part without its own AAS keeps its STEP file as an extra
+      Model3D entry of the AAS whose BOM lists it.
 
     bom_strategy is for scripts/evaluate.py (D2 size comparison). "bulk" forces
     flat composition so BulkCount can collapse sibling occurrences in one tree.
@@ -91,7 +102,19 @@ def write_aasx(
     if _weak_name(doc.root.name) and stem:
         doc.root.name = stem
 
-    if assembly_structure == "single" and doc.root.is_assembly:
+    if assembly_structure in _LEAN_PREFIX and doc.root.is_assembly:
+        _build_lean(
+            doc,
+            obj_store,
+            file_store,
+            ids,
+            idshorts,
+            org,
+            mode=assembly_structure,
+            embed=embed,
+            include_partial_nameplate=include_partial_nameplate,
+        )
+    elif assembly_structure == "single" and doc.root.is_assembly:
         _build_single_aas(
             doc,
             obj_store,
@@ -107,7 +130,8 @@ def write_aasx(
         for part in _unique_leaf_prototypes(doc.root).values():
             # C1: an XML root describes structure; its referenced STEP is the geometry.
             whole_model = (
-                single_part and part is doc.root
+                single_part
+                and part is doc.root
                 and pathlib.Path(doc.source_path).suffix.lower() in (".stp", ".step")
             )
             _build_part_aas(
@@ -168,15 +192,21 @@ def _embed_conversion_provenance(doc, obj_store, file_store, ids, mode):
         key = doc.root.ref_key
     elif mode == "single":
         key = "__single__"
+    elif mode in _LEAN_PREFIX:
+        key = f"{_LEAN_PREFIX[mode]}:{_ROOT_ASSET_KEY}"
     else:
         key = _asm_key(doc.root, True, flat=(mode == "flat"))
     leaves = list(_iter_leaves(doc.root))
     manifest = doc.source_manifest
     if not manifest and doc.source_path:
-        manifest = [{
-            "path": pathlib.Path(doc.source_path).name,
-            "role": "geometry", "status": "present", "sha256": doc.file_hash,
-        }]
+        manifest = [
+            {
+                "path": pathlib.Path(doc.source_path).name,
+                "role": "geometry",
+                "status": "present",
+                "sha256": doc.file_hash,
+            }
+        ]
     toolchain = {"step2aas": __version__}
     for distribution in ("basyx-python-sdk", "lxml"):
         try:
@@ -206,10 +236,14 @@ def _embed_conversion_provenance(doc, obj_store, file_store, ids, mode):
         "/aasx/suppl/conversion-provenance.json", io.BytesIO(data), "application/json"
     )
     root_models = next(item for item in obj_store if item.id == ids.sm(key, "m3"))
-    root_models.submodel_element.add(model.File(
-        id_short="ConversionProvenance", content_type="application/json", value=path,
-        semantic_id=ext_ref(load("models3d")["semantics"]["ConversionProvenance"]),
-    ))
+    root_models.submodel_element.add(
+        model.File(
+            id_short="ConversionProvenance",
+            content_type="application/json",
+            value=path,
+            semantic_id=ext_ref(load("models3d")["semantics"]["ConversionProvenance"]),
+        )
+    )
 
 
 # --- part AAS ---------------------------------------------------------------
@@ -305,15 +339,21 @@ def _build_assembly_aas(
     is_root,
     recurse,
     strategy: str = "occurrence",
+    in_aas=None,
+    lean_prefix: str | None = None,
 ):
     """Build one assembly AAS (root or sub-assembly). recurse=False → BOM lists only
-    direct children (hierarchical); True → whole subtree nested (flat)."""
+    direct children (hierarchical); True → whole subtree nested (flat).
+    in_aas/lean_prefix (D9): the BOM follows the packaging set; parts listed in
+    this BOM without an AAS of their own become extra Model3D entries."""
     if not is_root:
         # D2/D8: the shared prototype owns a local scene, not its first occurrence's
         # placement in the parent. Copy to keep the parent's occurrence tree intact.
         node = replace(node, transform=None)
     key = _asm_key(node, is_root, flat=recurse)
     asset_key = _ROOT_ASSET_KEY if is_root else key  # same asset across modes
+    if lean_prefix:
+        key = f"{lean_prefix}:{_asm_key(node, is_root)}"
     asm_asset_id = ids.asset(asset_key)
 
     thumb_shape = node.shape_ref if node.shape_ref is not None else _placed_compound(node)
@@ -324,6 +364,7 @@ def _build_assembly_aas(
         payload = _embed_composed_step(file_store, node, thumb_shape, source_colors=doc.color_tool)
     png_name = _embed_preview(file_store, node, ids, key, shape=thumb_shape)
 
+    node_paths: dict[tuple[int, ...], str] = {}
     bom = build_bom(
         node,
         ids.sm(key, "bom"),
@@ -331,21 +372,52 @@ def _build_assembly_aas(
         lambda p: ids.asset(_child_asset_key(p)),
         recurse=recurse,
         strategy=strategy,  # type: ignore[arg-type]
+        node_paths=node_paths,
+        in_aas=in_aas,
     )  # §2
-    m3 = build_models3d(
-        node,
-        payload.name,
-        png_name,
-        ids.sm(key, "m3"),
-        doc.header,
-        file_version_id=doc.file_hash[:12],  # D5
-        pmi_included=payload.pmi_included,
-    )  # §4
+    loose = _listed_parts_without_aas(node, in_aas) if in_aas is not None else {}
+    file_of: dict[str, str] = {}
+    if loose:  # D9: whole-assembly entry first, then the parts without own AAS
+        entries = [(node, payload.name, png_name)]
+        pmi_files = {payload.name} if payload.name and payload.pmi_included else set()
+        for ref_key, part in loose.items():
+            part_payload = _embed_step(file_store, part, doc, embed=embed, whole_model=False)
+            entries.append((part, part_payload.name, _embed_preview(file_store, part, ids, ref_key)))
+            if part_payload.name:
+                file_of[ref_key] = part_payload.name
+                if part_payload.pmi_included:
+                    pmi_files.add(part_payload.name)
+        m3 = build_models3d_multi(
+            entries,
+            ids.sm(key, "m3"),
+            doc.header,
+            file_version_id=doc.file_hash[:12],
+            pmi_included_files=pmi_files,
+        )
+    else:
+        m3 = build_models3d(
+            node,
+            payload.name,
+            png_name,
+            ids.sm(key, "m3"),
+            doc.header,
+            file_version_id=doc.file_hash[:12],  # D5
+            pmi_included=payload.pmi_included,
+        )  # §4
     td = build_technical_data(_aggregate_props(node), org, ids.sm(key, "td"))  # D3
 
     # Derived placement "scene": each leaf occurrence's world 4x4 in this subtree
     # (gap G1 retained so viewers can compose the assembled geometry).
-    scene_name = _embed_assembly_scene(file_store, node, ids, asm_asset_id, key)
+    scene_name = _embed_assembly_scene(
+        file_store,
+        node,
+        ids,
+        asm_asset_id,
+        key,
+        file_of=file_of or None,
+        bom_id=bom.id,
+        node_paths=node_paths,
+    )
     if scene_name:
         m3.submodel_element.add(
             model.File(
@@ -370,6 +442,93 @@ def _build_assembly_aas(
         submodel={model.ModelReference.from_referable(sm) for sm in (bom, m3, td)},
     )
     obj_store.add(aas)
+
+
+def _multiplicities(root: PartNode) -> dict[tuple[bool, str], int]:
+    """Number of uses (paths from the root) of every design, keyed by
+    (is_assembly, ref_key); the root itself is not counted."""
+    out: dict[tuple[bool, str], int] = {}
+
+    def walk(node: PartNode) -> None:
+        for child in node.children:
+            k = (child.is_assembly, child.ref_key)
+            out[k] = out.get(k, 0) + 1
+            if child.is_assembly:
+                walk(child)
+
+    walk(root)
+    return out
+
+
+def lean_set(root: PartNode, mode: str):
+    """D9 packaging set as a predicate on non-root designs: lean-hierarchical
+    S* = {r} ∪ R, lean-flat S_F = {r} ∪ (R ∩ P), R = designs used at least twice."""
+    mult = _multiplicities(root)
+    parts_only = mode == "lean-flat"
+
+    def in_aas(node: PartNode) -> bool:
+        if mult.get((node.is_assembly, node.ref_key), 0) < 2:
+            return False
+        return not (parts_only and node.is_assembly)
+
+    return in_aas
+
+
+def _listed_parts_without_aas(node: PartNode, in_aas) -> dict[str, PartNode]:
+    """Parts that this assembly's BOM lists (descending through co-managed
+    sub-assemblies) and that have no AAS of their own."""
+    out: dict[str, PartNode] = {}
+
+    def walk(n: PartNode) -> None:
+        for child in n.children:
+            if in_aas(child):
+                continue
+            if child.is_assembly:
+                walk(child)
+            else:
+                out.setdefault(child.ref_key, child)
+
+    walk(node)
+    return out
+
+
+def _build_lean(
+    doc, obj_store, file_store, ids, idshorts, org, *, mode, embed, include_partial_nameplate
+):
+    """D9: lean-hierarchical / lean-flat packaging."""
+    root = doc.root
+    in_aas = lean_set(root, mode)
+    prefix = _LEAN_PREFIX[mode]
+    for part in _unique_leaf_prototypes(root).values():
+        if in_aas(part):
+            _build_part_aas(
+                part,
+                doc,
+                obj_store,
+                file_store,
+                ids,
+                idshorts,
+                org,
+                embed=embed,
+                whole_model=False,
+                include_partial_nameplate=include_partial_nameplate,
+            )
+    for asm in _unique_assemblies(root).values():
+        if asm is root or in_aas(asm):
+            _build_assembly_aas(
+                asm,
+                doc,
+                obj_store,
+                file_store,
+                ids,
+                idshorts,
+                org,
+                embed=embed,
+                is_root=(asm is root),
+                recurse=False,
+                in_aas=in_aas,
+                lean_prefix=prefix,
+            )
 
 
 def _build_single_aas(
@@ -403,15 +562,39 @@ def _build_single_aas(
         pmi_included_files.add(root_payload.name)
 
     m3 = build_models3d_multi(
-        entries, ids.sm(key, "m3"), doc.header, file_version_id=doc.file_hash[:12],
+        entries,
+        ids.sm(key, "m3"),
+        doc.header,
+        file_version_id=doc.file_hash[:12],
         pmi_included_files=pmi_included_files,
     )  # many Model3D
+
+    # Co-managed BOM (no separate part assets); full occurrence tree.
+    node_paths: dict[tuple[int, ...], str] = {}
+    bom = build_bom(
+        root,
+        ids.sm(key, "bom"),
+        asset_id,
+        lambda p: "",
+        recurse=True,
+        linked=False,
+        node_paths=node_paths,
+    )
 
     # Placement scene so the viewer can show the full top-level 3D. File-keyed:
     # single mode has no per-part AAS to resolve instances by asset id. Must be
     # referenced by a File element or the AASX writer drops it from the package.
     if root.is_assembly and file_of:
-        scene_name = _embed_assembly_scene(file_store, root, ids, asset_id, key, file_of=file_of)
+        scene_name = _embed_assembly_scene(
+            file_store,
+            root,
+            ids,
+            asset_id,
+            key,
+            file_of=file_of,
+            bom_id=bom.id,
+            node_paths=node_paths,
+        )
         if scene_name:
             m3.submodel_element.add(
                 model.File(
@@ -422,8 +605,6 @@ def _build_single_aas(
                 )
             )
     td = build_technical_data(_aggregate_props(root), org, ids.sm(key, "td"))
-    # Co-managed BOM (no separate part assets); full occurrence tree.
-    bom = build_bom(root, ids.sm(key, "bom"), asset_id, lambda p: "", recurse=True, linked=False)
 
     for sm in (bom, m3, td):
         obj_store.add(sm)
@@ -476,17 +657,31 @@ def _embed_assembly_scene(
     asm_asset_id: str,
     key: str,
     file_of: dict[str, str] | None = None,
+    bom_id: str | None = None,
+    node_paths: dict[tuple[int, ...], str] | None = None,
 ) -> str:
     """Embed the placement scene (world transforms per part occurrence).
 
     `file_of` (ref_key → embedded .stp name) adds a "file" key per instance so the
-    viewer can resolve parts that have no AAS of their own (single mode)."""
+    viewer can resolve parts that have no AAS of their own (single mode).
+
+    Occurrence keys (G1/D8): "path" is the occurrence path as child indices from
+    this assembly ("0/2/1"); "node" is the idShort path of the deepest BOM Node on
+    that path in submodel "bom", and "below" counts the occurrence levels under it
+    that have no Node in this BOM (0 → the Node is the occurrence itself)."""
     instances: list[dict] = []
-    for node, w in _iter_world_leaves(root):
+    for node, w, path in _iter_world_leaves(root, with_path=True):
         inst = {
             "asset": ids.asset(node.ref_key),
             "world": [v for row in w for v in row],  # 16 floats, row-major
+            "path": "/".join(str(i) for i in path),
         }
+        if node_paths is not None and bom_id:
+            for cut in range(len(path), 0, -1):
+                hit = node_paths.get(path[:cut])
+                if hit:
+                    inst.update(bom=bom_id, node=hit, below=len(path) - cut)
+                    break
         if file_of and file_of.get(node.ref_key):
             inst["file"] = file_of[node.ref_key]
         instances.append(inst)
@@ -503,21 +698,22 @@ def _mat4_mul(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
     return [[sum(a[i][k] * b[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
 
 
-def _iter_world_leaves(root: PartNode):
-    """Yield (leaf_node, world_4x4_row_major) for every leaf occurrence, applying
-    the accumulated instance transforms (S2). Shared by the placement scene and
-    the placed-compound builder."""
+def _iter_world_leaves(root: PartNode, with_path: bool = False):
+    """Yield (leaf_node, world_4x4_row_major[, path]) for every leaf occurrence,
+    applying the accumulated instance transforms (S2). `path` is the tuple of
+    child indices from `root`. Shared by the placement scene and the
+    placed-compound builder."""
     identity = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
 
-    def walk(node: PartNode, world: list[list[float]]):
+    def walk(node: PartNode, world: list[list[float]], path: tuple[int, ...]):
         w = _mat4_mul(world, node.transform) if node.transform else world
         if node.is_assembly:
-            for child in node.children:
-                yield from walk(child, w)
+            for i, child in enumerate(node.children):
+                yield from walk(child, w, path + (i,))
         else:
-            yield node, w
+            yield (node, w, path) if with_path else (node, w)
 
-    yield from walk(root, identity)
+    yield from walk(root, identity, ())
 
 
 # --- supplementary files ----------------------------------------------------

@@ -88,6 +88,60 @@ def make_assembly(path: pathlib.Path) -> None:
     _write(doc, path)
 
 
+def make_nested_assembly(path: pathlib.Path) -> None:
+    """Top assembly with a sub-assembly used twice (repeated sub-assembly, M=2)
+    plus one direct part: exercises sharing and occurrence keys across modes."""
+    doc = _new_doc()
+    st = XCAFDoc_DocumentTool.ShapeTool(doc.Main())
+    box_lab = st.AddShape(BRepPrimAPI_MakeBox(20.0, 20.0, 20.0).Shape(), False)
+    _set_name(box_lab, "Cube")
+    cyl_lab = st.AddShape(BRepPrimAPI_MakeCylinder(5.0, 30.0).Shape(), False)
+    _set_name(cyl_lab, "Pin")
+    pair = st.NewShape()
+    _set_name(pair, "Pair")
+    st.AddComponent(pair, box_lab, _translation(0, 0, 0))
+    st.AddComponent(pair, cyl_lab, _translation(30, 0, 0))
+    top = st.NewShape()
+    _set_name(top, "Rig")
+    st.AddComponent(top, pair, _translation(0, 0, 0))
+    st.AddComponent(top, pair, _translation(0, 100, 0))
+    st.AddComponent(top, box_lab, _translation(200, 0, 0))
+    st.UpdateAssemblies()
+    _write(doc, path)
+
+
+def make_cart_assembly(path: pathlib.Path) -> None:
+    """The paper's cart, plus a sub-assembly used once: Cart = 2 x Caster
+    (Bolt, Wheel) + Frame + Handle (Grip). Repeated: Caster, Bolt, Wheel."""
+    doc = _new_doc()
+    st = XCAFDoc_DocumentTool.ShapeTool(doc.Main())
+
+    def part(shape, name):
+        lab = st.AddShape(shape, False)
+        _set_name(lab, name)
+        return lab
+
+    bolt = part(BRepPrimAPI_MakeCylinder(2.0, 12.0).Shape(), "Bolt")
+    wheel = part(BRepPrimAPI_MakeCylinder(10.0, 6.0).Shape(), "Wheel")
+    frame = part(BRepPrimAPI_MakeBox(120.0, 60.0, 4.0).Shape(), "Frame")
+    grip = part(BRepPrimAPI_MakeBox(8.0, 40.0, 8.0).Shape(), "Grip")
+    caster = st.NewShape()
+    _set_name(caster, "Caster")
+    st.AddComponent(caster, wheel, _translation(0, 0, 0))
+    st.AddComponent(caster, bolt, _translation(0, 0, 10))
+    handle = st.NewShape()
+    _set_name(handle, "Handle")
+    st.AddComponent(handle, grip, _translation(0, 0, 0))
+    top = st.NewShape()
+    _set_name(top, "Cart")
+    st.AddComponent(top, caster, _translation(10, 10, -20))
+    st.AddComponent(top, caster, _translation(100, 10, -20))
+    st.AddComponent(top, frame, _translation(0, 0, 0))
+    st.AddComponent(top, handle, _translation(-10, 10, 4))
+    st.UpdateAssemblies()
+    _write(doc, path)
+
+
 def main() -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
     make_single_part(FIXTURES / "single_part.stp")

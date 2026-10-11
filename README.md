@@ -48,7 +48,7 @@ Inputs:
   STEP part files are resolved relative to the XML.
 
 Options:
-- `--assembly-structure {hierarchical,flat,single}` — AAS composition (default `hierarchical`):
+- `--assembly-structure {hierarchical,flat,single,lean-hierarchical,lean-flat}` — AAS composition (default `hierarchical`):
   - `hierarchical` — one AAS per unique part **and** per unique sub-assembly; each
     assembly's 02011 BOM lists its direct children (`ArcheType=OneDown`) and
     identifies their assets through each Node's `globalAssetId`.
@@ -56,6 +56,12 @@ Options:
     whole tree (`ArcheType=Full`), nested sub-assemblies appear as co-managed BOM nodes.
   - `single` — one AAS for the whole model (all parts as Model3D entries + a co-managed
     `Full` BOM tree); experimental comparison baseline.
+  - `lean-hierarchical` — AAS only for the root and for every design used more than
+    once. Same answers as `hierarchical` (every repeated design is one asset), fewer AAS.
+  - `lean-flat` — AAS only for the root and for every part used more than once. Same
+    answers as `flat` (every part use keeps its own BOM entry), fewer AAS.
+    In both lean modes, a part without its own AAS keeps its STEP file as an extra
+    Model3D entry of the AAS whose BOM lists it.
 
   The root `globalAssetId` is identical across modes (same physical asset), while root
   AAS/submodel ids differ per mode — outputs of several modes for the same file can be

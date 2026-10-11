@@ -66,9 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--assembly-structure",
         dest="assembly_structure",
-        choices=("hierarchical", "flat", "single"),
+        choices=("hierarchical", "flat", "single", "lean-hierarchical", "lean-flat"),
         default="hierarchical",
-        help="AAS composition: hierarchical (default) | flat | single",
+        help=(
+            "AAS composition: hierarchical (default) | flat | single | "
+            "lean-hierarchical (AAS only for root + designs used more than once) | "
+            "lean-flat (AAS only for root + parts used more than once)"
+        ),
     )
     p.add_argument(
         "--derive-lightweight",
