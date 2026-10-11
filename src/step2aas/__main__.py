@@ -75,6 +75,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p.add_argument(
+        "--use-records",
+        dest="use_records",
+        action="store_true",
+        help=(
+            "also store each part use's path and transform as a UseRecords collection on "
+            "its BOM Entity (prototype of the proposed per-use IDTA 02011 element)"
+        ),
+    )
+    p.add_argument(
         "--derive-lightweight",
         action="store_true",
         help="[reserved] derive lightweight geometry (X3D/glTF) — future work §6a",
@@ -117,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         embed=not args.link_only,
         include_partial_nameplate=args.include_partial_nameplate,
         assembly_structure=args.assembly_structure,
+        use_records=args.use_records,
     )
     print(f"wrote {output}")
 

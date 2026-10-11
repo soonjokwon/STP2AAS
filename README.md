@@ -67,6 +67,10 @@ Options:
   AAS/submodel ids differ per mode — outputs of several modes for the same file can be
   loaded into one repository side by side. Part AAS are shared between hierarchical/flat.
   See *Choosing a packaging option* below.
+- `--use-records` — also store each part use's path and transform as a
+  `UseRecords` collection on the deepest BOM Entity of its path (prototype of a
+  per-use element for IDTA 02011). With it, a package with an AAS for every
+  repeated sub-assembly can still hold data for each use inside it.
 - `--link-only` — do not embed the original whole-model file (DigitalFile holds its
   path). Split per-part STEP files are still embedded.
 - `--include-partial-nameplate` — emit the intentionally-incomplete 02006 Nameplate

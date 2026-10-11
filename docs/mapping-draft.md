@@ -226,6 +226,7 @@ step2aas 가 산출하는 것은 **설계 시점 Type AAS** 다. STEP 은 제조
 | D7 | 필수 필드 미충족 처리 | Nameplate 생략 / 02026 내 필수: fallback 상수 + provenance Qualifier |
 | D8 | 인스턴스 4×4 의 표준 슬롯 | **C25 CartRefSystem 을 내보내지 않음.** 어셈블리 `PlacementScene` JSON 이 G1 의 provision artifact. 각 instance 는 `asset`·`world` 외에 occurrence 키를 가진다: `path`(어셈블리 기준 자식 인덱스 경로), `bom`(같은 어셈블리 BOM submodel id), `node`(해당 경로에서 가장 깊은 BOM Node 의 idShort 경로), `below`(Node 아래 BOM 에 없는 occurrence 단계 수; OneDown 에서 깊은 occurrence 는 `below`≥1). |
 | D9 | 반복 설계만 AAS 를 받는 구성 | **lean-hierarchical**: S = {root} ∪ R (R = 루트에서 경로가 2개 이상인 설계), **lean-flat**: S = {root} ∪ (R ∩ 부품). 각 S-어셈블리 BOM 은 S 에 속한 자식에서 멈추고(self-managed Node), S 밖 서브어셈블리는 co-managed Node 로 인라인 중첩(커버리지 규칙). ArcheType: S-어셈블리 자식이 하나라도 있으면 `OneDown`, 아니면 `Full`. AAS 가 없는 부품의 STEP 은 그 부품을 나열하는 BOM 의 AAS 에 추가 Model3D 엔트리로 넣고, PlacementScene instance 에 `file` 키로 연결. 루트·서브어셈블리 AAS/서브모델 id 는 `lean-h:`/`lean-f:` 접두사로 모드별 분리, asset id 는 다른 모드와 공유. 규칙 1·2 의 결과는 각각 hierarchical·flat 과 같고 AAS 수만 줄어든다 (tests/test_lean.py, scripts/evaluate_lean.py). |
+| D10 | 사용처별 데이터의 AAS 내 표현 (제안 02011 확장의 시제품) | `--use-records` 지정 시, PlacementScene 의 각 instance 를 그 경로에서 가장 깊은 BOM Entity 의 statements 아래 `UseRecords` SMC (semanticId `https://step2aas.org/ext/UseRecords/1/0`) 에 `Use{n}` 레코드로 기록: `PathBelow`(Entity 아래 자식 인덱스 경로, Entity 가 곧 사용처면 빈 문자열), `Transform`(BOM 을 가진 어셈블리 좌표계의 4×4, row-major), `LengthUnit`=mm, `PartAssetId`. 반복 서브어셈블리에 AAS 를 줘도 그 안의 각 사용처에 데이터를 붙일 자리가 생김 (tests/test_use_records.py, scripts/check_use_records.py). 기본값은 off. |
 
 ---
 

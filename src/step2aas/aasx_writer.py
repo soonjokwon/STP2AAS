@@ -62,6 +62,7 @@ def write_aasx(
     include_partial_nameplate: bool = False,
     assembly_structure: str = "hierarchical",
     bom_strategy: str | None = None,
+    use_records: bool = False,
 ) -> None:
     """Convert the intermediate representation to an .aasx package.
 
@@ -82,6 +83,9 @@ def write_aasx(
 
     bom_strategy is for scripts/evaluate.py (D2 size comparison). "bulk" forces
     flat composition so BulkCount can collapse sibling occurrences in one tree.
+    use_records (D10): also write each part use's path and transform as a
+    "UseRecords" collection on the deepest BOM Entity of its path (prototype of
+    the per-use template element proposed for IDTA 02011).
     """
     strategy = bom_strategy or "occurrence"
     if strategy == "bulk":
@@ -113,6 +117,7 @@ def write_aasx(
             mode=assembly_structure,
             embed=embed,
             include_partial_nameplate=include_partial_nameplate,
+            use_records=use_records,
         )
     elif assembly_structure == "single" and doc.root.is_assembly:
         _build_single_aas(
@@ -124,6 +129,7 @@ def write_aasx(
             org,
             embed=embed,
             include_partial_nameplate=include_partial_nameplate,
+            use_records=use_records,
         )
     else:
         single_part = not doc.root.is_assembly
@@ -161,6 +167,7 @@ def write_aasx(
                         is_root=(asm is doc.root),
                         recurse=False,
                         strategy=strategy,
+                        use_records=use_records,
                     )
             else:  # flat
                 _build_assembly_aas(
@@ -175,6 +182,7 @@ def write_aasx(
                     is_root=True,
                     recurse=True,
                     strategy=strategy,
+                    use_records=use_records,
                 )
 
     _embed_conversion_provenance(doc, obj_store, file_store, ids, assembly_structure)
@@ -341,6 +349,7 @@ def _build_assembly_aas(
     strategy: str = "occurrence",
     in_aas=None,
     lean_prefix: str | None = None,
+    use_records: bool = False,
 ):
     """Build one assembly AAS (root or sub-assembly). recurse=False → BOM lists only
     direct children (hierarchical); True → whole subtree nested (flat).
@@ -418,6 +427,8 @@ def _build_assembly_aas(
         bom_id=bom.id,
         node_paths=node_paths,
     )
+    if use_records:
+        _add_use_records(bom, _scene_instances(node, ids, file_of or None, bom.id, node_paths))
     if scene_name:
         m3.submodel_element.add(
             model.File(
@@ -493,7 +504,8 @@ def _listed_parts_without_aas(node: PartNode, in_aas) -> dict[str, PartNode]:
 
 
 def _build_lean(
-    doc, obj_store, file_store, ids, idshorts, org, *, mode, embed, include_partial_nameplate
+    doc, obj_store, file_store, ids, idshorts, org, *, mode, embed, include_partial_nameplate,
+    use_records=False,
 ):
     """D9: lean-hierarchical / lean-flat packaging."""
     root = doc.root
@@ -528,11 +540,13 @@ def _build_lean(
                 recurse=False,
                 in_aas=in_aas,
                 lean_prefix=prefix,
+                use_records=use_records,
             )
 
 
 def _build_single_aas(
-    doc, obj_store, file_store, ids, idshorts, org, *, embed, include_partial_nameplate
+    doc, obj_store, file_store, ids, idshorts, org, *, embed, include_partial_nameplate,
+    use_records=False,
 ):
     """One AAS for the whole model: all unique parts as Model3D entries + a
     co-managed 02011 BOM tree + aggregate TechnicalData (experimental baseline)."""
@@ -604,6 +618,8 @@ def _build_single_aas(
                     semantic_id=ext_ref(load("models3d")["semantics"]["PlacementScene"]),
                 )
             )
+    if use_records and root.is_assembly:
+        _add_use_records(bom, _scene_instances(root, ids, file_of, bom.id, node_paths))
     td = build_technical_data(_aggregate_props(root), org, ids.sm(key, "td"))
 
     for sm in (bom, m3, td):
@@ -669,6 +685,18 @@ def _embed_assembly_scene(
     this assembly ("0/2/1"); "node" is the idShort path of the deepest BOM Node on
     that path in submodel "bom", and "below" counts the occurrence levels under it
     that have no Node in this BOM (0 → the Node is the occurrence itself)."""
+    instances = _scene_instances(root, ids, file_of, bom_id, node_paths)
+    scene = {"assembly_asset_id": asm_asset_id, "unit": "mm", "instances": instances}
+    payload = json.dumps(scene).encode("utf-8")
+    return file_store.add_file(
+        f"/aasx/suppl/{_safe(root.name)}_{_safe(key)}__scene.json",
+        io.BytesIO(payload),
+        "application/json",
+    )
+
+
+def _scene_instances(root, ids, file_of=None, bom_id=None, node_paths=None) -> list[dict]:
+    """One record per leaf occurrence of `root` (shared by the scene and D10)."""
     instances: list[dict] = []
     for node, w, path in _iter_world_leaves(root, with_path=True):
         inst = {
@@ -685,13 +713,68 @@ def _embed_assembly_scene(
         if file_of and file_of.get(node.ref_key):
             inst["file"] = file_of[node.ref_key]
         instances.append(inst)
-    scene = {"assembly_asset_id": asm_asset_id, "unit": "mm", "instances": instances}
-    payload = json.dumps(scene).encode("utf-8")
-    return file_store.add_file(
-        f"/aasx/suppl/{_safe(root.name)}_{_safe(key)}__scene.json",
-        io.BytesIO(payload),
-        "application/json",
-    )
+    return instances
+
+
+_USE_RECORDS_SEM = "https://step2aas.org/ext/UseRecords/1/0"
+_USE_RECORD_SEM = "https://step2aas.org/ext/UseRecord/1/0"
+
+
+def _add_use_records(bom, instances: list[dict]) -> int:
+    """D10 (prototype of the proposed 02011 extension): attach one record per part
+    use to the deepest Entity on its path in this BOM, as a SubmodelElementCollection
+    "UseRecords" among the Entity's statements. Each record holds the path below the
+    Entity (child indices; empty if the Entity is the use itself), the 4x4 transform
+    in the coordinate system of the assembly that owns this BOM, the length unit and
+    the asset id of the part. Returns the number of records written."""
+    by_node: dict[str, list[dict]] = {}
+    for inst in instances:
+        if inst.get("bom") == bom.id and inst.get("node"):
+            by_node.setdefault(inst["node"], []).append(inst)
+    written = 0
+    for id_path, insts in by_node.items():
+        entity = _entity_at(bom, id_path)
+        if entity is None:
+            continue
+        records = []
+        for k, inst in enumerate(insts, 1):
+            below = inst.get("below", 0)
+            path = inst["path"].split("/") if inst["path"] else []
+            below_path = "/".join(path[len(path) - below:]) if below else ""
+            records.append(
+                model.SubmodelElementCollection(
+                    id_short=f"Use{k}",
+                    semantic_id=ext_ref(_USE_RECORD_SEM),
+                    value=[
+                        model.Property(id_short="PathBelow", value_type=model.datatypes.String,
+                                       value=below_path),
+                        model.Property(id_short="Transform", value_type=model.datatypes.String,
+                                       value=" ".join(f"{v:.9g}" for v in inst["world"])),
+                        model.Property(id_short="LengthUnit", value_type=model.datatypes.String,
+                                       value="mm"),
+                        model.Property(id_short="PartAssetId", value_type=model.datatypes.String,
+                                       value=inst["asset"]),
+                    ],
+                )
+            )
+        entity.statement.add(
+            model.SubmodelElementCollection(
+                id_short="UseRecords", semantic_id=ext_ref(_USE_RECORDS_SEM), value=records
+            )
+        )
+        written += len(records)
+    return written
+
+
+def _entity_at(bom, id_path: str):
+    """Entity of `bom` at an idShort path such as "EntryNode.Node1.Node4"."""
+    names = id_path.split(".")
+    current = next((e for e in bom.submodel_element if e.id_short == names[0]), None)
+    for name in names[1:]:
+        if current is None:
+            return None
+        current = next((e for e in current.statement if e.id_short == name), None)
+    return current
 
 
 def _mat4_mul(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
