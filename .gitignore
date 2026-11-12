@@ -13,6 +13,7 @@ tests/fixtures/*.step
 # Real-world AP242 / STEP datasets dropped in for local testing.
 tests/*.step
 tests/*.stp
+tests/*.zip
 tests/km3-d5-242_v2/
 tests/r50j_as3/
 tests/xml/

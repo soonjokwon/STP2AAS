@@ -45,6 +45,21 @@ class PartNode:
     source_file: str | None = None
     # S9: representative RGB (0..1) from XCAF, kept when re-exporting a split part.
     color: tuple[float, float, float] | None = None
+    # S4 (gap G2 closed): identity of the design as stated in the STEP file.
+    # product.id / product.name, product_definition_formation.id (the version),
+    # the product_definition's instance name in the source file ("#39") and, for
+    # AP242 Ed.4 files, the UUID assigned to it (CAx-IF Persistent IDs).
+    step_product_id: str | None = None
+    step_product_name: str | None = None
+    step_version_id: str | None = None
+    step_pd_ref: str | None = None
+    step_uuid: str | None = None
+    # S1: the next_assembly_usage_occurrence this node is a use of (None for the
+    # root): its id attribute, its instance name in the source file ("#412") and
+    # its UUID when the file assigns one.
+    step_nauo_id: str | None = None
+    step_nauo_ref: str | None = None
+    step_nauo_uuid: str | None = None
 
     @property
     def is_assembly(self) -> bool:

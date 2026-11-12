@@ -84,6 +84,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p.add_argument(
+        "--asset-namespace",
+        dest="asset_namespace",
+        metavar="IRI",
+        help=(
+            "an IRI you control (e.g. https://example.com/parts). Designs with a STEP "
+            "product.id then get the persistent globalAssetId <IRI>/<product id>[/<version>] "
+            "instead of an identifier derived from the file hash"
+        ),
+    )
+    p.add_argument(
         "--derive-lightweight",
         action="store_true",
         help="[reserved] derive lightweight geometry (X3D/glTF) — future work §6a",
@@ -127,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         include_partial_nameplate=args.include_partial_nameplate,
         assembly_structure=args.assembly_structure,
         use_records=args.use_records,
+        asset_namespace=args.asset_namespace,
     )
     print(f"wrote {output}")
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "step2aas"
-version = "0.2.1"
+version = "0.3.0"
 description = "Convert STEP (ISO 10303) CAD models into AAS digital twin packages (.aasx)"
 requires-python = ">=3.11"
 readme = "README.md"

@@ -122,3 +122,21 @@ catalogue ID, 제품 revision 관계, 조직 간 identity reconciliation은 별�
 변환 중 입력 파일이 다른 프로세스에 의해 바뀌지 않는 것을 전제로 한다. 이 기능은
 원자적 snapshot을 만들지 않는다. 도구 버전, 매핑 설정, preview 렌더링과 ZIP 메타데이터는
 입력 해시의 일부가 아니므로 같은 입력 ID가 전체 AASX 바이트 동일성을 보장하지 않는다.
+
+## 7. STEP 식별 정보와 지속 식별자 (D11, 2026-11-13)
+
+Part 21 입력에서는 XDE 라벨과 STEP 엔티티를 연결해 다음을 읽는다 (`extract/step_identity.py`).
+
+- 설계: `product.id`, `product.name`, `product_definition_formation.id`, `product_definition`의
+  인스턴스 이름(`#39`), 그리고 파일이 부여한 UUID(AP242 Ed.4 `*_UUID_ATTRIBUTE`).
+- use: `next_assembly_usage_occurrence`의 id 속성, 인스턴스 이름(`#412`), UUID.
+
+`globalAssetId`는 (1) UUID가 있으면 `urn:uuid:<uuid>`, (2) `--asset-namespace`가 주어지고
+`product.id`가 있으면 `<namespace>/<product id>[/<version>]`, (3) 그 밖에는 기존의 파일
+해시 기반 값이다. (1)·(2)에서는 AAS·submodel ID도 자산 식별자에서 파생하므로 재내보내기와
+파일 간에 유지된다. 한 파일 안에서 두 설계가 같은 지속 식별자를 갖게 되면 둘 다 (3)으로 둔다.
+기본 동작(옵션 없음, UUID 없음)의 ID는 이전 버전과 같다.
+
+인스턴스 이름은 Part 21 텍스트를 스캔해 얻고, OCC 모델의 같은 종류 엔티티와 개수·순서·id
+속성이 모두 일치할 때만 사용한다. 일치하지 않으면 인스턴스 이름 없이 진행한다.
+AP242 XML 입력은 아직 (3)만 지원한다. UUID 읽기는 합성 파일로만 검증했다.

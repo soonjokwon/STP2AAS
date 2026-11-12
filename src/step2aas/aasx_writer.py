@@ -11,7 +11,9 @@ import io
 import json
 import logging
 import pathlib
+import re
 import tempfile
+import urllib.parse
 import uuid
 from dataclasses import dataclass, replace
 from importlib.metadata import PackageNotFoundError, version
@@ -63,6 +65,7 @@ def write_aasx(
     assembly_structure: str = "hierarchical",
     bom_strategy: str | None = None,
     use_records: bool = False,
+    asset_namespace: str | None = None,
 ) -> None:
     """Convert the intermediate representation to an .aasx package.
 
@@ -86,6 +89,12 @@ def write_aasx(
     use_records (D10): also write each part use's path and transform as a
     "UseRecords" collection on the deepest BOM Entity of its path (prototype of
     the per-use template element proposed for IDTA 02011).
+    asset_namespace (D11): an IRI the user controls. With it, a design whose STEP
+    product.id is present and unambiguous gets the globalAssetId
+    "<namespace>/<product id>[/<version>]", which stays the same across re-exports
+    and across files. A design whose STEP file assigns a UUID (AP242 Ed.4) gets
+    "urn:uuid:<uuid>" with or without the namespace. All other designs keep the
+    file-scoped identifier derived from the file hash.
     """
     strategy = bom_strategy or "occurrence"
     if strategy == "bulk":
@@ -96,6 +105,7 @@ def write_aasx(
     obj_store = ObjectStore()
     file_store = DictSupplementaryFileContainer()
     ids = _Ids(doc.file_hash)
+    _assign_persistent_ids(doc.root, ids, asset_namespace)
     idshorts = _IdShortAllocator()
     org = doc.header.organization or _ORG_FALLBACK
 
@@ -300,10 +310,7 @@ def _build_part_aas(
         obj_store.add(sm)
 
     aas = model.AssetAdministrationShell(
-        asset_information=model.AssetInformation(
-            asset_kind=model.AssetKind.TYPE,  # design-time twin → Type AAS (gap G6)
-            global_asset_id=ids.asset(ref_key),
-        ),
+        asset_information=_asset_information(part, ids.asset(ref_key)),  # Type AAS (gap G6)
         id_=ids.aas(ref_key),
         id_short=idshorts.allocate(part.name),
         display_name=_display_name(part.name),  # human-readable unicode name
@@ -443,10 +450,7 @@ def _build_assembly_aas(
         obj_store.add(sm)
 
     aas = model.AssetAdministrationShell(
-        asset_information=model.AssetInformation(
-            asset_kind=model.AssetKind.TYPE,
-            global_asset_id=asm_asset_id,
-        ),
+        asset_information=_asset_information(node, asm_asset_id),
         id_=ids.aas(key),
         id_short=idshorts.allocate(node.name),
         display_name=_display_name(node.name),
@@ -626,10 +630,7 @@ def _build_single_aas(
         obj_store.add(sm)
 
     aas = model.AssetAdministrationShell(
-        asset_information=model.AssetInformation(
-            asset_kind=model.AssetKind.TYPE,
-            global_asset_id=asset_id,
-        ),
+        asset_information=_asset_information(root, asset_id),
         id_=ids.aas(key),
         id_short=idshorts.allocate(root.name),
         display_name=_display_name(root.name),
@@ -643,9 +644,11 @@ def _embed_composed_step(file_store, node: PartNode, compound, source_colors=Non
     if compound is None:
         return _StepPayload(None)
     const = load("models3d")["constants"]
-    target = f"/aasx/suppl/{_safe(node.name or node.ref_key)}_{_safe(node.ref_key)}_asm.stp"
+    target = f"/aasx/suppl/{_safe(node.name or node.ref_key)}_{_safe(node.ref_key)}_asm.stp".lower()
     try:
-        data = _export_shape_step(compound, source_colors=source_colors)
+        data = _export_shape_step(
+            compound, source_colors=source_colors, product=_product_labels(node)
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("assembly STEP export failed for %r: %s", node.name, exc)
         return _StepPayload(None)
@@ -687,9 +690,12 @@ def _embed_assembly_scene(
     that have no Node in this BOM (0 → the Node is the occurrence itself)."""
     instances = _scene_instances(root, ids, file_of, bom_id, node_paths)
     scene = {"assembly_asset_id": asm_asset_id, "unit": "mm", "instances": instances}
+    if any("nauo" in inst for inst in instances):
+        # "nauo" names instances of the STEP file with this SHA-256 (D11).
+        scene["step_source_sha256"] = ids.file_hash
     payload = json.dumps(scene).encode("utf-8")
     return file_store.add_file(
-        f"/aasx/suppl/{_safe(root.name)}_{_safe(key)}__scene.json",
+        f"/aasx/suppl/{_safe(root.name)}_{_safe(key)}__scene.json".lower(),
         io.BytesIO(payload),
         "application/json",
     )
@@ -712,8 +718,29 @@ def _scene_instances(root, ids, file_of=None, bom_id=None, node_paths=None) -> l
                     break
         if file_of and file_of.get(node.ref_key):
             inst["file"] = file_of[node.ref_key]
+        inst.update(_step_use_path(root, path))
         instances.append(inst)
     return instances
+
+
+def _step_use_path(root: PartNode, path: tuple[int, ...]) -> dict:
+    """D11: the use as the STEP file states it, i.e. the chain of
+    next_assembly_usage_occurrences from `root` down to the part. "nauo" holds
+    their instance names in the source file ("#412"), "nauo_id" their id
+    attributes and "nauo_uuid" their UUIDs. A key is present only if every NAUO
+    on the path has that value."""
+    chain = []
+    node = root
+    for index in path:
+        node = node.children[index]
+        chain.append(node)
+    out: dict = {}
+    for key, attr in (("nauo", "step_nauo_ref"), ("nauo_id", "step_nauo_id"),
+                      ("nauo_uuid", "step_nauo_uuid")):
+        values = [getattr(n, attr) for n in chain]
+        if values and all(values):
+            out[key] = values
+    return out
 
 
 _USE_RECORDS_SEM = "https://step2aas.org/ext/UseRecords/1/0"
@@ -754,6 +781,7 @@ def _add_use_records(bom, instances: list[dict]) -> int:
                                        value="mm"),
                         model.Property(id_short="PartAssetId", value_type=model.datatypes.String,
                                        value=inst["asset"]),
+                        *_step_path_properties(inst),
                     ],
                 )
             )
@@ -764,6 +792,18 @@ def _add_use_records(bom, instances: list[dict]) -> int:
         )
         written += len(records)
     return written
+
+
+def _step_path_properties(inst: dict) -> list:
+    """D11: the NAUO chain of the use, from the assembly that owns the BOM down to
+    the part, so the record can be traced to the STEP file."""
+    props = []
+    for id_short, key in (("StepNauoPath", "nauo"), ("StepNauoIdPath", "nauo_id"),
+                          ("StepNauoUuidPath", "nauo_uuid")):
+        if inst.get(key):
+            props.append(model.Property(id_short=id_short, value_type=model.datatypes.String,
+                                        value="/".join(inst[key])))
+    return props
 
 
 def _entity_at(bom, id_path: str):
@@ -808,7 +848,7 @@ def _embed_step(
     """Register C1 and propagate source PMI evidence only for verbatim bytes."""
     const = load("models3d")["constants"]
     safe = _safe(part.name or part.ref_key)
-    target = f"/aasx/suppl/{safe}_{_safe(part.ref_key)}.stp"
+    target = f"/aasx/suppl/{safe}_{_safe(part.ref_key)}.stp".lower()
 
     pmi_included = False
     if whole_model:
@@ -820,7 +860,9 @@ def _embed_step(
         pmi_included = part.has_pmi
     elif part.shape_ref is not None:
         # A new XCAF document copies shape/colour only, not source DimTol labels.
-        data = _export_shape_step(part.shape_ref, part.color, source_colors=doc.color_tool)
+        data = _export_shape_step(
+            part.shape_ref, part.color, source_colors=doc.color_tool, product=_product_labels(part)
+        )
     else:
         # No geometry available (e.g. AP242 XML part with a missing STEP file):
         # emit no DigitalFile value rather than crash (gap).
@@ -853,7 +895,7 @@ def _embed_preview(file_store, part: PartNode, ids: _Ids, ref_key: str, shape=No
             colored_shapes=_preview_colored_shapes(part, target_shape),
         )
         data = pathlib.Path(png_path).read_bytes()
-    target = f"/aasx/suppl/{_safe(part.name or ref_key)}_{_safe(ref_key)}_preview.png"
+    target = f"/aasx/suppl/{_safe(part.name or ref_key)}_{_safe(ref_key)}_preview.png".lower()
     return file_store.add_file(target, io.BytesIO(data), const["PreviewMimeType"])
 
 
@@ -940,6 +982,7 @@ def _export_shape_step(
     shape,
     color: tuple[float, float, float] | None = None,
     source_colors=None,
+    product: tuple[str, str] | None = None,
 ) -> bytes:
     """Re-export a single TopoDS_Shape to its own STEP (M2: per-part split).
 
@@ -1000,7 +1043,8 @@ def _export_shape_step(
         writer.Transfer(doc, STEPControl_AsIs)
         if writer.Write(path) != IFSelect_RetDone:
             raise RuntimeError("per-part STEP export failed")
-        return pathlib.Path(path).read_bytes()
+        data = pathlib.Path(path).read_bytes()
+    return _name_product(data, product) if product else data
 
 
 # --- assembly technical-data aggregation (D3) -------------------------------
@@ -1061,22 +1105,158 @@ def _iter_leaves(node: PartNode):
 
 
 class _Ids:
-    """Deterministic urn:step2aas ids seeded by file hash + ref_key (§0, D5)."""
+    """Deterministic ids. File-scoped by default: urn:step2aas ids seeded by the
+    file hash and the design's key (§0, D5). A design registered with persist()
+    uses its persistent globalAssetId instead, and its AAS and submodel ids are
+    seeded by that id, so they no longer depend on the file (D11)."""
+
+    _PREFIXES = ("lean-h:", "lean-f:", "flat:", "asm:")
+    _ROOT_KEYS = ("__assembly__", "__single__")
 
     def __init__(self, file_hash: str) -> None:
         self._hash = file_hash
+        self._persist: dict[str, str] = {}
+        self._root_key: str | None = None
+
+    @property
+    def file_hash(self) -> str:
+        return self._hash
+
+    def persist(self, design_key: str, asset_id: str, *, is_root: bool = False) -> None:
+        self._persist[design_key] = asset_id
+        if is_root:
+            self._root_key = design_key
+
+    def persistent(self, design_key: str) -> str | None:
+        return self._persist.get(design_key)
+
+    def _resolve(self, key: str) -> tuple[str | None, str]:
+        """(persistent asset id or None, the key without its design part)."""
+        rest = key
+        stripped = True
+        while stripped:
+            stripped = False
+            for prefix in self._PREFIXES:
+                if rest.startswith(prefix):
+                    rest = rest[len(prefix):]
+                    stripped = True
+        if rest in self._ROOT_KEYS:
+            return (self._persist.get(self._root_key) if self._root_key else None), key
+        return self._persist.get(rest), key[: len(key) - len(rest)]
 
     def _uid(self, key: str) -> str:
+        asset_id, role = self._resolve(key)
+        if asset_id:
+            return str(uuid.uuid5(_NS, f"{asset_id}|{role}"))
         return str(uuid.uuid5(_NS, f"{self._hash}:{key}"))
 
     def aas(self, key: str) -> str:
         return f"urn:step2aas:aas:{self._uid(key)}"
 
     def asset(self, key: str) -> str:
-        return f"urn:step2aas:asset:{self._uid(key)}"
+        asset_id, _ = self._resolve(key)
+        return asset_id or f"urn:step2aas:asset:{self._uid(key)}"
 
     def sm(self, key: str, kind: str) -> str:
         return f"urn:step2aas:sm:{kind}:{self._uid(key)}"
+
+
+def _unique_designs(root: PartNode) -> dict[str, PartNode]:
+    """ref_key → one node of every design in the tree, the root included."""
+    out: dict[str, PartNode] = {}
+
+    def walk(node: PartNode) -> None:
+        if node.ref_key and node.ref_key not in out:
+            out[node.ref_key] = node
+        for child in node.children:
+            walk(child)
+
+    walk(root)
+    return out
+
+
+def _persistent_asset_id(node: PartNode, namespace: str | None) -> str | None:
+    if node.step_uuid:
+        return f"urn:uuid:{node.step_uuid}"
+    if namespace and node.step_product_id:
+        parts = [namespace.rstrip("/"), urllib.parse.quote(node.step_product_id, safe="")]
+        if node.step_version_id:
+            parts.append(urllib.parse.quote(node.step_version_id, safe=""))
+        return "/".join(parts)
+    return None
+
+
+def _assign_persistent_ids(root: PartNode, ids: _Ids, namespace: str | None) -> None:
+    """D11: register a persistent globalAssetId for every design that has one and
+    only one. Two designs of the file that would share an id (the same product.id
+    and version on different product_definitions) both stay file-scoped."""
+    if namespace is not None and ":" not in namespace:
+        raise ValueError("asset_namespace must be an IRI, e.g. https://example.com/parts")
+    claims: dict[str, list[str]] = {}
+    for key, node in _unique_designs(root).items():
+        asset_id = _persistent_asset_id(node, namespace)
+        if asset_id:
+            claims.setdefault(asset_id, []).append(key)
+    for asset_id, keys in claims.items():
+        if len(keys) > 1:
+            logger.warning(
+                "%d designs share the identity %s; they keep file-scoped ids", len(keys), asset_id
+            )
+            continue
+        ids.persist(keys[0], asset_id, is_root=keys[0] == root.ref_key)
+
+
+def _asset_information(node: PartNode, global_asset_id: str):
+    """A Type asset with the identity the STEP file states as specificAssetIds."""
+    specific = []
+    for name, value in (
+        ("StepProductId", node.step_product_id),
+        ("StepProductVersion", node.step_version_id),
+        ("StepUuid", node.step_uuid),
+    ):
+        if value:
+            specific.append(model.SpecificAssetId(name=name, value=value))
+    return model.AssetInformation(
+        asset_kind=model.AssetKind.TYPE,
+        global_asset_id=global_asset_id,
+        specific_asset_id=specific,
+    )
+
+
+def _product_labels(node: PartNode) -> tuple[str, str]:
+    """(product.id, product.name) to write into a split STEP file."""
+    name = node.step_product_name or node.name or node.step_product_id or "part"
+    return (node.step_product_id or name, name)
+
+
+def _p21_string(text: str) -> str:
+    """A Part 21 string literal: quotes and backslashes doubled, characters
+    outside printable ASCII in the \\X2\\ encoding."""
+    out = []
+    for ch in text:
+        if ch == "'":
+            out.append("''")
+        elif ch == "\\":
+            out.append("\\\\")
+        elif 32 <= ord(ch) < 127:
+            out.append(ch)
+        elif ord(ch) <= 0xFFFF:
+            out.append(f"\\X2\\{ord(ch):04X}\\X0\\")
+        else:
+            out.append(f"\\X4\\{ord(ch):08X}\\X0\\")
+    return "'" + "".join(out) + "'"
+
+
+_RE_PRODUCT = re.compile(rb"(=\s*PRODUCT\s*\(\s*)'(?:[^']|'')*'(\s*,\s*)'(?:[^']|'')*'")
+
+
+def _name_product(data: bytes, product: tuple[str, str]) -> bytes:
+    """Give the single product of a split STEP file the id and name of the
+    design. Files with more than one product are left unchanged."""
+    if len(_RE_PRODUCT.findall(data)) != 1:
+        return data
+    pid, name = (_p21_string(v).encode("ascii") for v in product)
+    return _RE_PRODUCT.sub(lambda m: m.group(1) + pid + m.group(2) + name, data, count=1)
 
 
 class _IdShortAllocator:

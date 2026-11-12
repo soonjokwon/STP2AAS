@@ -26,19 +26,37 @@ from OCC.Core.TDF import TDF_Label, TDF_LabelSequence, TDF_Tool
 from OCC.Core.TDocStd import TDocStd_Document
 from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool
 
+from step2aas.extract import step_identity
 from step2aas.extract.p21_header import parse_header
 from step2aas.model import PartNode, PhysicalProps, Provenance, StepDocument
 
 logger = logging.getLogger(__name__)
 
+# Identity evidence for the file being walked (set by extract(), empty otherwise).
+_IDENTITY = step_identity.StepIdentity()
+
+
+def _apply_design(node: PartNode, entry: str) -> PartNode:
+    d = _IDENTITY.designs.get(entry)
+    if d is not None:
+        node.step_product_id = d.product_id
+        node.step_product_name = d.product_name
+        node.step_version_id = d.version_id
+        node.step_pd_ref = d.pd_ref
+        node.step_uuid = d.uuid
+    return node
+
 
 def extract(path: str) -> StepDocument:
     """Load a STEP file into the intermediate representation (S1~S12, S14)."""
-    doc = _read_step_document(path)
+    doc, reader = _read_step_document(path, with_reader=True)
     shape_tool = XCAFDoc_DocumentTool.ShapeTool(doc.Main())
     mat_tool = _material_tool(doc)
     color_tool = XCAFDoc_DocumentTool.ColorTool(doc.Main())  # S9
     pmi_entries = _collect_pmi_shape_entries(doc)
+    # S4: product ids, versions, NAUOs and UUIDs as the file states them (G2).
+    global _IDENTITY
+    _IDENTITY = step_identity.collect(reader, shape_tool, path, _entry)
 
     roots = TDF_LabelSequence()
     shape_tool.GetFreeShapes(roots)  # S1: root/free shapes (usually 1)
@@ -58,6 +76,7 @@ def extract(path: str) -> StepDocument:
         root = PartNode(name="Model", product_id="Model", ref_key="__root__")
         root.children = top_nodes
 
+    _IDENTITY = step_identity.StepIdentity()
     header = parse_header(path)
     return StepDocument(
         root=root,
@@ -104,7 +123,7 @@ def load_geometry(path: str):
     return comp, props, _bounding_box(comp), pmi
 
 
-def _read_step_document(path: str) -> TDocStd_Document:
+def _read_step_document(path: str, with_reader: bool = False):
     reader = STEPCAFControl_Reader()
     reader.SetNameMode(True)  # S3: product names
     reader.SetColorMode(True)  # S9: colours (preview quality only)
@@ -121,7 +140,7 @@ def _read_step_document(path: str) -> TDocStd_Document:
     doc = TDocStd_Document("XmlXCAF")
     if not reader.Transfer(doc):
         raise ValueError(f"STEP transfer produced no data: {path}")
-    return doc
+    return (doc, reader) if with_reader else doc
 
 
 # --- recursion: mirrors STP2X3D STEP_Reader.cpp AddSubComponents ------------
@@ -146,7 +165,7 @@ def _walk(shape_tool, label: TDF_Label, pmi_entries: set[str], mat_tool, color_t
             node.children.append(
                 _walk_component(shape_tool, comps.Value(i), pmi_entries, mat_tool, color_tool)
             )
-        return node
+        return _apply_design(node, _entry(label))
     return _leaf(shape_tool, label, pmi_entries, mat_tool, color_tool)
 
 
@@ -166,6 +185,11 @@ def _walk_component(
     # belongs to the occurrence, not the shared prototype.
     node.name = _label_name(comp_label) or node.name
     node.transform = transform
+    use = _IDENTITY.uses.get(_entry(comp_label))
+    if use is not None:
+        node.step_nauo_id = use.nauo_id
+        node.step_nauo_ref = use.nauo_ref
+        node.step_nauo_uuid = use.uuid
     return node
 
 
@@ -174,9 +198,9 @@ def _leaf(shape_tool, label: TDF_Label, pmi_entries: set[str], mat_tool, color_t
     entry = _entry(label)
     props = _physical_props(shape)  # S7 (computed via BRepGProp)
     _fill_material(mat_tool, label, props)  # S8 / B6 / B7
-    return PartNode(
+    node = PartNode(
         name=_label_name(label) or "Part",
-        product_id=entry,  # STEP product.id is not separately exposed by XDE (gap G2)
+        product_id=entry,  # XDE label entry; the STEP product.id is step_product_id
         ref_key=entry,
         shape_ref=shape,
         bbox_mm=_bounding_box(shape),  # S12
@@ -184,6 +208,7 @@ def _leaf(shape_tool, label: TDF_Label, pmi_entries: set[str], mat_tool, color_t
         has_pmi=entry in pmi_entries,  # S14 -> C21
         color=_shape_color(color_tool, shape_tool, label, shape),  # S9
     )
+    return _apply_design(node, entry)
 
 
 def _shape_color(color_tool, _shape_tool, label, shape) -> tuple[float, float, float] | None:

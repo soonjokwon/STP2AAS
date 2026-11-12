@@ -61,12 +61,14 @@ def test_pmi_metadata_follows_payload_lineage(tmp_path, mode, xml_source):
         assert len(entries) == (3 if mode == "hierarchical" else 2)
         for file_name, pmi in entries:
             assert file_name is not None
-            verbatim = ("Leaf_" in file_name) if xml_source else ("Root_" in file_name)
+            verbatim = ("leaf_" in file_name) if xml_source else ("root_" in file_name)
             if verbatim:
                 assert archive.read(file_name.lstrip("/")) == source.read_bytes()
                 assert pmi == ["PMI"]
             else:
-                assert archive.read(file_name.lstrip("/")) != source.read_bytes()
+                # A re-exported payload never advertises PMI. Its bytes are not
+                # compared with the source: the fixture is itself an Open CASCADE
+                # export, and a re-export that keeps the product id can equal it.
                 assert pmi == []
     assert leaf.has_pmi and sub.has_pmi  # output policy never rewrites source evidence
     assert not root.has_pmi

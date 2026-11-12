@@ -71,6 +71,10 @@ Options:
   `UseRecords` collection on the deepest BOM Entity of its path (prototype of a
   per-use element for IDTA 02011). With it, a package with an AAS for every
   repeated sub-assembly can still hold data for each use inside it.
+- `--asset-namespace <IRI>` — an IRI you control, e.g. `https://example.com/parts`.
+  Designs with a STEP `product.id` then get the persistent `globalAssetId`
+  `<IRI>/<product id>[/<version>]` instead of an identifier derived from the file
+  hash. See *Identity and traceability* below.
 - `--link-only` — do not embed the original whole-model file (DigitalFile holds its
   path). Split per-part STEP files are still embedded.
 - `--include-partial-nameplate` — emit the intentionally-incomplete 02006 Nameplate
@@ -131,6 +135,44 @@ model has no repeated sub-assembly, every option lists all uses separately.
   apart by their path (mapping D8).
 - The original STEP is embedded per part as an AASX supplementary file; a 512² preview PNG is
   rendered offscreen (solid-colour placeholder fallback on headless GL failure, D6).
+
+## Identity and traceability
+
+**Asset identifiers.** Each design is one asset. Its `globalAssetId` comes from the
+first source that applies:
+
+1. A UUID that the STEP file assigns to the design's `product_definition` or
+   `product_definition_shape` (AP242 Edition 4, CAx-IF recommended practice
+   *Persistent IDs*) gives `urn:uuid:<uuid>`. This reader is based on the published
+   entity names and has been tested only on a synthetic file.
+2. With `--asset-namespace <IRI>`, a design with a STEP `product.id` gets
+   `<IRI>/<product id>[/<version>]`, where the version is the
+   `product_definition_formation.id`. The identifier stays the same when the model is
+   exported again and when the same part appears in another file. Choose a namespace
+   that you own, because product ids such as `Part1` are not unique between companies.
+3. Otherwise the identifier is `urn:step2aas:asset:<uuid5>` derived from the SHA-256 of
+   the input file and the design's place in it. It is stable for the same bytes only:
+   a new export of the same model gives new identifiers, and "the same design" holds
+   inside one package.
+
+Two designs of one file that would receive the same persistent identifier both fall
+back to case 3, with a warning. AAS and submodel ids follow the asset identifier, so
+they are persistent in cases 1 and 2. AP242 XML input always uses case 3.
+
+Whatever the `globalAssetId`, every AAS states what the STEP file says about its
+design as `specificAssetIds`: `StepProductId`, `StepProductVersion` and `StepUuid`.
+Split part files keep the product id and name of the design in their `PRODUCT` entity.
+
+**From a use back to the STEP file.** Each `PlacementScene` record carries the chain of
+`next_assembly_usage_occurrence`s from the assembly down to the part: `nauo` (instance
+names in the source file, such as `#3810`), `nauo_id` (their id attributes) and
+`nauo_uuid` (their UUIDs, when the file has them). `step_source_sha256` names the file
+that the instance names belong to; it is the whole-model STEP file embedded in the
+package. With `--use-records`, the same chain is written on the BOM Entity as
+`StepNauoPath`, `StepNauoIdPath` and `StepNauoUuidPath`.
+
+Supplementary file names are lower case, because the package relationships are
+written in lower case and case-sensitive readers would not find the files otherwise.
 
 ## Downstream use (why a Type AAS from CAD)
 
