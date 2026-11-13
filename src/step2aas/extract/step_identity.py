@@ -99,20 +99,28 @@ def scan_p21(path: str) -> _TextScan:
 # --- Open CASCADE side -------------------------------------------------------
 
 
-def _cast(cls, ent):
-    """The entity as `cls`, or None. OCP downcasts on return; pythonocc needs DownCast."""
+def _cast(cls, ent, names: tuple[str, ...]):
+    """The entity as `cls`, or None. OCP downcasts on return, so isinstance is
+    enough there. pythonocc returns Standard_Transient and its DownCast must only
+    be tried on an entity of a matching dynamic type."""
     if isinstance(ent, cls):
         return ent
     down = getattr(cls, "DownCast", None)
     if down is None:
         return None
     try:
+        if ent.DynamicType().Name() not in names:
+            return None
         out = down(ent)
     except Exception:  # noqa: BLE001
         return None
     if out is None or (hasattr(out, "IsNull") and out.IsNull()):
         return None
     return out
+
+
+_NAUO_TYPES = ("StepRepr_NextAssemblyUsageOccurrence",)
+_PD_TYPES = ("StepBasic_ProductDefinition", "StepBasic_ProductDefinitionWithAssociatedDocuments")
 
 
 def _text(handle) -> str | None:
@@ -165,11 +173,11 @@ def _collect(reader, shape_tool, path, entry_of) -> StepIdentity:
     pds, nauos = [], []
     for i in range(1, model.NbEntities() + 1):
         ent = model.Value(i)
-        nauo = _cast(StepRepr_NextAssemblyUsageOccurrence, ent)
+        nauo = _cast(StepRepr_NextAssemblyUsageOccurrence, ent, _NAUO_TYPES)
         if nauo is not None:
             nauos.append(nauo)
             continue
-        pd = _cast(StepBasic_ProductDefinition, ent)
+        pd = _cast(StepBasic_ProductDefinition, ent, _PD_TYPES)
         if pd is not None:
             pds.append(pd)
 

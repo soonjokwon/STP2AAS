@@ -57,7 +57,7 @@ IRDI/IRI 가 바뀌므로 자동 이전하지 않는다.
 | C1~C25 (02026-1-0) | https://admin-shell.io/idta/Models3D/... | ✅ 검증 | IDTA 02026-1-0 스펙 원문. C1 MIME `application/step` 은 관행(공식 `model/step` 미등록). C25 는 D8 로 미방출 | 2026-07-23 / 2026-08-18 |
 | A1~A6 (02011-1-1) | https://admin-shell.io/idta/HierarchicalStructures/... | ✅ 검증 | IDTA-02011-1-1 PDF (2024-06). Submodel `/1/1/Submodel`, 요소는 `/1/0` | 2026-08-18 |
 | B0~B2 (02003-1-2) | ZVEI/TechnicalData/... + ECLASS IRDI #002/#001 | ✅ 검증 | IDTA-02003-1-2 PDF (2022-10). v2.0 은 `0173-1#01-AHX837#002` 등으로 이전 — 핀 유지 | 2026-08-18 |
-| B3~B7 props | https://step2aas.org/props/... | 자체 정의 | 표준 어휘 부재(갭 §3). 논문에서 논의 | 2026-07-23 |
+| B3~B7 props | https://github.com/soonjokwon/STP2AAS/props/... | 자체 정의 | 표준 어휘 부재(갭 §3). 논문에서 논의 | 2026-07-23 |
 | D (02006-2-0) | https://admin-shell.io/zvei/nameplate/2/0/Nameplate + IRDI | ✅ 검증 | IDTA-02006-2-0 PDF. 기본 정책상 서브모델 생략(D7). v3.0 IRI 는 `idta/nameplate/3/0` | 2026-08-18 |
 
 ⚠️ 로 남은 것은 C1 MIME 선택뿐. 코드의 `# VERIFY` 주석은 위 표가 ✅ 인 항목에서 제거함.

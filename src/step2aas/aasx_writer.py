@@ -232,7 +232,7 @@ def _embed_conversion_provenance(doc, obj_store, file_store, ids, mode):
         except PackageNotFoundError:
             toolchain[distribution] = "unavailable"
     record = {
-        "schema": "https://step2aas.org/ext/ConversionProvenance/1/0",
+        "schema": "https://github.com/soonjokwon/STP2AAS/ext/ConversionProvenance/1/0",
         "identity_scheme": doc.identity_scheme,
         "identity_hash": doc.file_hash,
         "legacy_top_level_sha256": doc.legacy_file_hash,
@@ -743,8 +743,8 @@ def _step_use_path(root: PartNode, path: tuple[int, ...]) -> dict:
     return out
 
 
-_USE_RECORDS_SEM = "https://step2aas.org/ext/UseRecords/1/0"
-_USE_RECORD_SEM = "https://step2aas.org/ext/UseRecord/1/0"
+_USE_RECORDS_SEM = "https://github.com/soonjokwon/STP2AAS/ext/UseRecords/1/0"
+_USE_RECORD_SEM = "https://github.com/soonjokwon/STP2AAS/ext/UseRecord/1/0"
 
 
 def _add_use_records(bom, instances: list[dict]) -> int:

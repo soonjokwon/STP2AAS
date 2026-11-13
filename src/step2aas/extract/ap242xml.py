@@ -118,6 +118,19 @@ class _Context:
         return self.geo_cache[stp_path]
 
 
+def _id_of(el) -> str | None:
+    """The Id of a Part, PartVersion or Occurrence: <Id id="..."/> or the first
+    <Id><Identifier id="..."/></Id>."""
+    id_el = el.find("{*}Id")
+    if id_el is None:
+        return None
+    value = id_el.attrib.get("id")
+    if not value:
+        ident = id_el.find("{*}Identifier")
+        value = ident.attrib.get("id") if ident is not None else None
+    return value or None
+
+
 class _Ap242Reader:
     def __init__(self, path: str) -> None:
         self.path = path
@@ -146,8 +159,12 @@ class _Ap242Reader:
             type_el = part.find(".//{*}PartTypes/{*}ClassString")
             is_assembly = type_el is not None and "assembly" in (type_el.text or "").lower()
             pvs = part.findall(".//{*}PartView")
+            versions = [v for v in part.iter() if _ln(v) == "PartVersion"]
             self.parts[part_uid] = {
                 "name": (name_el.text or "").strip() if name_el is not None else part_uid,
+                # D11: the identifiers the file states (Part.Id, PartVersion.Id).
+                "product_id": _id_of(part),
+                "version_id": _id_of(versions[0]) if len(versions) == 1 else None,
                 "is_assembly": is_assembly,
                 "pv_uids": [pv.attrib.get("uid") for pv in pvs],
             }
@@ -169,7 +186,7 @@ class _Ap242Reader:
         if not self.parts:
             raise ValueError(f"AP242 XML {self.path}: no Part elements")
         edges = self._edges()
-        children_parts = {c for kids in edges.values() for (c, _, _) in kids}
+        children_parts = {c for kids in edges.values() for (c, *_rest) in kids}
         roots = [
             uid
             for uid, info in self.parts.items()
@@ -181,8 +198,8 @@ class _Ap242Reader:
             logger.warning("AP242 XML %s: multiple root candidates; using first", self.stem)
         return self._build(roots[0], edges, None, None, ctx, depth, visiting)
 
-    def _edges(self) -> dict[str, list[tuple[str, list, str]]]:
-        edges: dict[str, list[tuple[str, list, str]]] = {}
+    def _edges(self) -> dict[str, list[tuple]]:
+        edges: dict[str, list[tuple]] = {}
         for pv in self.root_el.iter():
             if _ln(pv) != "PartView":
                 continue
@@ -197,7 +214,12 @@ class _Ap242Reader:
                 if child_part is None:
                     continue
                 edges.setdefault(parent_part, []).append(
-                    (child_part, self._transform(vor), self._occ_name(related.attrib.get("uidRef")))
+                    (
+                        child_part,
+                        self._transform(vor),
+                        self._occ_name(related.attrib.get("uidRef")),
+                        related.attrib.get("uidRef"),
+                    )
                 )
         return edges
 
@@ -211,6 +233,24 @@ class _Ap242Reader:
         depth,
         visiting,
         ancestors: frozenset = frozenset(),
+        occ_uid: str | None = None,
+    ) -> PartNode:
+        node = self._build_node(
+            part_uid, edges, transform, instance_name, ctx, depth, visiting, ancestors
+        )
+        # D11: identity as stated in the XML. A nested file's own root Part has
+        # already named its design; the referencing Part only fills gaps.
+        info = self.parts[part_uid]
+        node.step_product_id = node.step_product_id or info["product_id"]
+        node.step_product_name = node.step_product_name or info["name"]
+        node.step_version_id = node.step_version_id or info["version_id"]
+        if occ_uid:
+            node.step_nauo_id = instance_name
+            node.step_nauo_ref = occ_uid  # uid of the Occurrence element
+        return node
+
+    def _build_node(
+        self, part_uid, edges, transform, instance_name, ctx, depth, visiting, ancestors
     ) -> PartNode:
         # S1: only the current path is guarded; repeated prototypes in sibling
         # branches are valid occurrences and must not be mistaken for cycles.
@@ -230,7 +270,7 @@ class _Ap242Reader:
                 ref_key=ctx.xml_key(pathlib.Path(self.path), part_uid),
                 transform=transform,
             )
-            for child_part, xform, occ_name in child_edges:
+            for child_part, xform, occ_name, child_occ_uid in child_edges:
                 node.children.append(
                     self._build(
                         child_part,
@@ -241,6 +281,7 @@ class _Ap242Reader:
                         depth,
                         visiting,
                         ancestors | {part_uid},
+                        occ_uid=child_occ_uid,
                     )
                 )
             return node
@@ -415,7 +456,7 @@ class _Ap242Reader:
             [0.0, 0.0, 0.0, 1.0],
         ]
 
-    def _occ_name(self, occ_uid: str) -> str | None:
+    def _occ_name(self, occ_uid: str) -> str | None:  # Occurrence.Id
         occ = self.by_uid.get(occ_uid)
         if occ is None:
             return None

@@ -55,8 +55,8 @@ semantics:
   NormOrientationVector: "https://admin-shell.io/idta/Models3D/Model3D/Geometry/CartRefSystem/NormOrientationVector/1/0"
   # step2aas extension: assembly placement scene (per-occurrence world transforms).
   # Official G1 workaround (design decision D8). Non-standard.
-  PlacementScene: "https://step2aas.org/ext/PlacementScene/1/0"
-  ConversionProvenance: "https://step2aas.org/ext/ConversionProvenance/1/0"
+  PlacementScene: "https://github.com/soonjokwon/STP2AAS/ext/PlacementScene/1/0"
+  ConversionProvenance: "https://github.com/soonjokwon/STP2AAS/ext/ConversionProvenance/1/0"
 
 constants:
   StatusValue: "Released"          # C6, ValueList-StatusValue

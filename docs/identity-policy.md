@@ -139,4 +139,7 @@ Part 21 입력에서는 XDE 라벨과 STEP 엔티티를 연결해 다음을 읽�
 
 인스턴스 이름은 Part 21 텍스트를 스캔해 얻고, OCC 모델의 같은 종류 엔티티와 개수·순서·id
 속성이 모두 일치할 때만 사용한다. 일치하지 않으면 인스턴스 이름 없이 진행한다.
-AP242 XML 입력은 아직 (3)만 지원한다. UUID 읽기는 합성 파일로만 검증했다.
+AP242 XML 입력에서는 `Part.Id`, `PartVersion.Id`가 product id와 버전 역할을 하고, use의 인스턴스
+이름 자리에는 `Occurrence`의 uid가 들어간다(합성 파일로만 검증, UUID는 읽지 않음).
+Part 21의 UUID 읽기도 합성 파일로만 검증했다. pythonocc 7.9(conda-forge, Linux)와 OCP 두 바인딩에서
+전체 테스트를 통과했다.

@@ -13,16 +13,16 @@ semantics:
   TechnicalProperties: "https://admin-shell.io/ZVEI/TechnicalData/TechnicalProperties/1/1"
 
 # B3~B6: no standard vocabulary exists (gap §3) -> self-defined namespace.
-props_namespace: "https://step2aas.org/props"
+props_namespace: "https://github.com/soonjokwon/STP2AAS/props"
 props:
-  Volume: "https://step2aas.org/props/Volume/1/0"            # B3
-  SurfaceArea: "https://step2aas.org/props/SurfaceArea/1/0"  # B4
-  Centroid: "https://step2aas.org/props/Centroid/1/0"        # B5
-  CentroidX: "https://step2aas.org/props/Centroid/X/1/0"     # B5
-  CentroidY: "https://step2aas.org/props/Centroid/Y/1/0"     # B5
-  CentroidZ: "https://step2aas.org/props/Centroid/Z/1/0"     # B5
-  Material: "https://step2aas.org/props/Material/1/0"        # B6
-  Mass: "https://step2aas.org/props/Mass/1/0"                # B7
+  Volume: "https://github.com/soonjokwon/STP2AAS/props/Volume/1/0"            # B3
+  SurfaceArea: "https://github.com/soonjokwon/STP2AAS/props/SurfaceArea/1/0"  # B4
+  Centroid: "https://github.com/soonjokwon/STP2AAS/props/Centroid/1/0"        # B5
+  CentroidX: "https://github.com/soonjokwon/STP2AAS/props/Centroid/X/1/0"     # B5
+  CentroidY: "https://github.com/soonjokwon/STP2AAS/props/Centroid/Y/1/0"     # B5
+  CentroidZ: "https://github.com/soonjokwon/STP2AAS/props/Centroid/Z/1/0"     # B5
+  Material: "https://github.com/soonjokwon/STP2AAS/props/Material/1/0"        # B6
+  Mass: "https://github.com/soonjokwon/STP2AAS/props/Mass/1/0"                # B7
 
 fallbacks:
   organization: "unknown"   # B2 / G2

@@ -263,3 +263,26 @@ def test_nested_depth_boundary_still_stops_with_recorded_boundary(tmp_path, capl
     assert node.ref_key == "unexpanded:file:level21.stpx"
     assert len(doc.source_manifest) == 22
     assert "level22.stpx" not in {item["path"] for item in doc.source_manifest}
+
+
+def test_part_and_occurrence_ids_reach_the_nodes(tmp_path):
+    """D11: Part.Id, PartVersion.Id and Occurrence uid/Id are carried on the nodes."""
+    source = _source(tmp_path / "asm.stpx", ["bolt.stp", "bolt.stp"])
+    _geometry(tmp_path / "bolt.stp")
+    root = etree.parse(str(source)).getroot()
+    for uid, pid in (("root", "A-100"), ("p0", "B-7"), ("p1", "B-7")):
+        part = root.find(f"Part[@uid='{uid}']")
+        part.insert(0, etree.Element("Id", id=pid))
+        version = part.find("PartVersion")
+        version.insert(0, etree.Element("Id", id="C"))
+    for index in (0, 1):
+        occurrence = root.find(f".//Occurrence[@uid='o{index}']")
+        etree.SubElement(occurrence, "Id", id=f"bolt.{index + 1}")
+    source.write_bytes(etree.tostring(root, encoding="utf-8"))
+
+    top = _extract(source).root
+    assert (top.step_product_id, top.step_version_id, top.step_nauo_ref) == ("A-100", "C", None)
+    assert [c.step_product_id for c in top.children] == ["B-7", "B-7"]
+    assert [c.step_nauo_ref for c in top.children] == ["o0", "o1"]
+    assert [c.step_nauo_id for c in top.children] == ["bolt.1", "bolt.2"]
+    assert top.children[0].ref_key == top.children[1].ref_key  # one design, two uses

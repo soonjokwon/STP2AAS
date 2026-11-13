@@ -157,7 +157,8 @@ first source that applies:
 
 Two designs of one file that would receive the same persistent identifier both fall
 back to case 3, with a warning. AAS and submodel ids follow the asset identifier, so
-they are persistent in cases 1 and 2. AP242 XML input always uses case 3.
+they are persistent in cases 1 and 2. For AP242 XML input, `Part.Id` and `PartVersion.Id` take
+the place of the product id and version (tested on synthetic files only), and UUIDs are not read.
 
 Whatever the `globalAssetId`, every AAS states what the STEP file says about its
 design as `specificAssetIds`: `StepProductId`, `StepProductVersion` and `StepUuid`.
@@ -166,7 +167,8 @@ Split part files keep the product id and name of the design in their `PRODUCT` e
 **From a use back to the STEP file.** Each `PlacementScene` record carries the chain of
 `next_assembly_usage_occurrence`s from the assembly down to the part: `nauo` (instance
 names in the source file, such as `#3810`), `nauo_id` (their id attributes) and
-`nauo_uuid` (their UUIDs, when the file has them). `step_source_sha256` names the file
+`nauo_uuid` (their UUIDs, when the file has them). For AP242 XML input, `nauo` holds the uid of
+each `Occurrence` element. `step_source_sha256` names the file
 that the instance names belong to; it is the whole-model STEP file embedded in the
 package. With `--use-records`, the same chain is written on the BOM Entity as
 `StepNauoPath`, `StepNauoIdPath` and `StepNauoUuidPath`.
