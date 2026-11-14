@@ -2,9 +2,9 @@
 
 STEP (ISO 10303) CAD models → Asset Administration Shell (AAS) digital twin packages (.aasx).
 
-![CAx-IF AS1 in AASX Package Explorer and the STP2AAS HTML viewer](docs/images/as1.png)
+![AS1 (ISO 10303-44, Annex E) in AASX Package Explorer and the STP2AAS HTML viewer](docs/images/as1.png)
 
-CAx-IF AS1 (AP214): [AASX Package Explorer](https://github.com/eclipse-aaspe/package-explorer) on the left,
+AS1 from ISO 10303-44, Annex E (AP214 file): [AASX Package Explorer](https://github.com/eclipse-aaspe/package-explorer) on the left,
 STP2AAS HTML viewer on the right. Converted with `--assembly-structure hierarchical --view`.
 
 ## Setup (self-contained — everything in this one folder)
@@ -256,7 +256,7 @@ with basyx, and assert submodels, semanticIds, and BOM cardinality. Drop STEP/AP
 datasets under `tests/` (gitignored) to exercise real-world models; AP242 tests skip
 when none are present. Coverage/size/time CSV: `python scripts/evaluate.py --synthetic`.
 
-The public CAx-IF AS1 sample used in the screenshot is `tests/as1/as1_root.stp`.
+The public AS1 assembly (ISO 10303-44, Annex E) used in the screenshot is `tests/as1/as1_root.stp`.
 
 ## Data
 
